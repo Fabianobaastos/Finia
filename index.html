@@ -118,9 +118,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
 
 /* ── LISTA LANÇAMENTOS ──────────────────────────────────────────────────── */
 .lanc-group-title{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.07em;padding:6px 0 8px}
-.lanc-item{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid rgba(51,65,85,.4);cursor:pointer;transition:opacity .15s}
+.lanc-item{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid rgba(51,65,85,.4);cursor:pointer;transition:background .15s,opacity .15s;border-radius:8px;margin:0 -4px}
 .lanc-item:last-child{border-bottom:none}
 .lanc-item:active{opacity:.7}
+.lanc-item.selecionado{background:rgba(99,102,241,.12);border-bottom-color:rgba(99,102,241,.2)}
+.lanc-item .lanc-check{width:22px;height:22px;border-radius:50%;border:2px solid #334155;display:none;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;transition:all .15s;background:transparent}
+.modo-selecao .lanc-item .lanc-check{display:flex}
+.lanc-item.selecionado .lanc-check{border-color:#6366f1;background:#6366f1;color:#fff}
+.barra-selecao{position:fixed;bottom:calc(68px + var(--safe-b));left:0;right:0;z-index:150;background:rgba(15,23,42,.97);backdrop-filter:blur(16px);border-top:1px solid rgba(99,102,241,.3);padding:12px 18px;display:none;align-items:center;justify-content:space-between;gap:12px}
+.barra-selecao.ativa{display:flex}
+.barra-selecao-info{font-size:13px;font-weight:600;color:#a78bfa}
+.barra-selecao-acoes{display:flex;gap:10px}
+.btn-sel-cancel{padding:9px 16px;border-radius:10px;border:1.5px solid #334155;background:transparent;color:#94a3b8;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.btn-sel-delete{padding:9px 16px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px}
 .lanc-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .lanc-info{flex:1;min-width:0}
 .lanc-desc{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -451,11 +461,12 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
   <!-- ── TAB: LANÇAMENTOS ───────────────────────────────────────────── -->
   <div class="tab-content page" id="tab-lanc">
-    <div style="display:flex;gap:8px;margin-bottom:12px">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
       <button class="imp-type-btn active" id="filt-todos" onclick="filtLanc('todos',this)">Todos</button>
       <button class="imp-type-btn" id="filt-rec" onclick="filtLanc('rec',this)">Entradas</button>
       <button class="imp-type-btn" id="filt-desp" onclick="filtLanc('desp',this)">Saídas</button>
     </div>
+    <div id="lanc-cat-filter-wrap" style="margin-bottom:12px;display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none"></div>
     <div id="lanc-list"></div>
   </div>
 
@@ -482,6 +493,28 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           </div>
           <div class="imp-type-card-check" id="iCheck_fatura" style="opacity:0">✓</div>
         </button>
+        <button class="imp-type-card" id="iBtn_comprovante" onclick="selImpTipo('comprovante')">
+          <div class="imp-type-card-icon">🧾</div>
+          <div class="imp-type-card-body">
+            <div class="imp-type-card-title">Comprovante de pagamento</div>
+            <div class="imp-type-card-sub">PIX, TED, boleto — foto ou PDF. IA lê e cria o lançamento.</div>
+          </div>
+          <div class="imp-type-card-check" id="iCheck_comprovante" style="opacity:0">✓</div>
+        </button>
+      </div>
+      <!-- Upload comprovante -->
+      <div id="comprovante-wrap" style="display:none">
+        <div class="drop-zone" id="iDropZoneComp"
+          onclick="document.getElementById('iFileComp').click()"
+          ondrop="handleDropComp(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+          <div class="drop-zone-icon">🧾</div>
+          <div class="drop-zone-title">Toque para escolher imagem ou PDF</div>
+          <div class="drop-zone-sub">Comprovante PIX, TED ou boleto</div>
+          <input type="file" id="iFileComp" accept="image/*,.pdf" style="display:none" onchange="handleComprovante(event)">
+        </div>
+        <div id="comp-status" style="display:none;margin-top:12px;padding:14px;background:var(--s1);border:1px solid var(--bd);border-radius:14px;font-size:13px;color:var(--mu);text-align:center">
+          ✨ Lendo comprovante...
+        </div>
       </div>
 
       <div id="iCartaoWrap" style="display:none;margin-bottom:16px">
@@ -682,6 +715,15 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
 
 </div><!-- /s-app -->
+
+<!-- ── BARRA SELEÇÃO MÚLTIPLA ─────────────────────────────────────────── -->
+<div class="barra-selecao" id="barra-selecao">
+  <div class="barra-selecao-info" id="barra-selecao-info">0 selecionados</div>
+  <div class="barra-selecao-acoes">
+    <button class="btn-sel-cancel" onclick="sairModoSelecao()">Cancelar</button>
+    <button class="btn-sel-delete" onclick="deletarSelecionados()">🗑 Apagar</button>
+  </div>
+</div>
 
 <!-- ── BOTTOM NAV ─────────────────────────────────────────────────────── -->
 <nav class="bottom-nav" id="bottom-nav" style="display:none">
@@ -1095,6 +1137,8 @@ let emojiSel = '💸';
 let colorSel = '#6366f1';
 let periodMode = 'mes';
 let lancFiltro = 'todos';
+let lancCatFiltro = 'todas';
+let relCatFiltro  = 'todas';
 let editLancId = null;
 let editCatId = null;
 let privMode = false;
@@ -2089,14 +2133,31 @@ function initImpMes(){
 function selImpTipo(tipo){
   impTipo = tipo;
   // Cards
-  document.getElementById('iBtn_extrato').classList.toggle('active', tipo==='extrato');
-  document.getElementById('iBtn_fatura').classList.toggle('active', tipo==='fatura');
-  document.getElementById('iCheck_extrato').style.opacity = tipo==='extrato'?'1':'0';
-  document.getElementById('iCheck_fatura').style.opacity  = tipo==='fatura' ?'1':'0';
-  // Mostrar/ocultar opções de cartão
-  document.getElementById('iCartaoWrap').style.display = tipo==='fatura' ? '' : 'none';
-  // Atualizar placeholder da textarea
+  ['extrato','fatura','comprovante'].forEach(t=>{
+    const btn = document.getElementById('iBtn_'+t);
+    const chk = document.getElementById('iCheck_'+t);
+    if(btn) btn.classList.toggle('active', t===tipo);
+    if(chk) chk.style.opacity = t===tipo ? '1' : '0';
+  });
+  // Mostrar/ocultar seções específicas
+  document.getElementById('iCartaoWrap').style.display     = tipo==='fatura'      ? '' : 'none';
+  document.getElementById('comprovante-wrap').style.display= tipo==='comprovante' ? '' : 'none';
+  // Área principal — ocultar no modo comprovante
+  const dz = document.getElementById('iDropZone');
+  if(dz) dz.style.display = tipo==='comprovante' ? 'none' : '';
   const ta = document.getElementById('iTextoRaw');
+  ta.style.display = tipo==='comprovante' ? 'none' : '';
+  // Separador "ou cole o texto"
+  const sep = ta.previousElementSibling;
+  if(sep) sep.style.display = tipo==='comprovante' ? 'none' : '';
+  // Botões analisar
+  ['rodarParser','rodarParserIA','verTextoExtraido'].forEach(fn=>{
+    const b = document.querySelector('[onclick*="'+fn+'"]');
+    if(b) b.style.display = tipo==='comprovante' ? 'none' : '';
+  });
+  const dica = document.querySelector('#imp-step1 [style*="10px;color:var(--mu)"]');
+  if(dica) dica.style.display = tipo==='comprovante' ? 'none' : '';
+  // Placeholder da textarea
   if(tipo==='extrato'){
     ta.placeholder='Cole o texto do extrato bancário (PDF copiado)...\n\nO Finia reconhece automaticamente Itaú, Nubank, Bradesco, Inter, BB, Caixa e C6.';
   } else {
@@ -3783,42 +3844,56 @@ document.addEventListener('click', e=>{
 
 // Registrar Service Worker para PWA (só funciona em HTTPS ou localhost)
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
-  window.addEventListener('load', ()=>{
-    // SW inline via blob para não precisar de arquivo separado
-    const swCode = `
-      const CACHE = 'finia-v1';
-      self.addEventListener('install', e=>{
-        e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/'])));
-      });
-      self.addEventListener('fetch', e=>{
-        e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));
-      });
-    `;
-    const blob = new Blob([swCode], {type:'application/javascript'});
-    const swUrl = URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl)
-      .then(()=>console.log('Finia SW registrado'))
-      .catch(()=>{}); // Silencioso se falhar
+  window.addEventListener('load', async ()=>{
+    // Registrar SW externo (necessário para share_target funcionar)
+    try {
+      await navigator.serviceWorker.register('/sw.js');
+      console.log('Finia SW registrado');
+    } catch(e){ console.warn('SW:', e); }
+
+    // Manifest externo com share_target
+    const link = document.createElement('link');
+    link.rel = 'manifest'; link.href = '/manifest.json';
+    document.head.appendChild(link);
+
+    // Verificar se chegou via compartilhamento (share_target)
+    const params = new URLSearchParams(location.search);
+    if(params.get('share') === '1'){
+      // Aguardar SW estar pronto e verificar arquivo pendente
+      await verificarCompartilhamentoPendente();
+    }
   });
-  // Manifest dinâmico para instalação como PWA
-  const manifest = {
-    name: 'Finia',
-    short_name: 'Finia',
-    description: 'Seu dinheiro, finalmente no controle.',
-    start_url: (typeof APP_URL !== "undefined" && !APP_URL.includes("COLE_AQUI")) ? APP_URL : location.href,
-    display: 'standalone',
-    background_color: '#0f172a',
-    theme_color: '#0f172a',
-    icons: [{
-      src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%230f172a'/%3E%3Ctext x='96' y='130' text-anchor='middle' font-family='Arial' font-weight='900' font-size='90' fill='%2322d3a5'%3Ef%3C/text%3E%3C/svg%3E",
-      sizes: '192x192', type: 'image/svg+xml'
-    }]
-  };
-  const mBlob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
-  const mUrl = URL.createObjectURL(mBlob);
-  const link = document.createElement('link');
-  link.rel='manifest'; link.href=mUrl;
-  document.head.appendChild(link);
+
+  // Receber arquivo do SW via postMessage
+  navigator.serviceWorker.addEventListener('message', e => {
+    if(e.data?.type === 'SHARE_COMPROVANTE'){
+      receberComprovanteCompartilhado(e.data.file);
+    }
+  });
+}
+
+async function verificarCompartilhamentoPendente(){
+  try {
+    const cache = await caches.open('finia-v2');
+    const resp  = await cache.match('/__share_pending');
+    if(resp){
+      const file = await resp.json();
+      await cache.delete('/__share_pending');
+      receberComprovanteCompartilhado(file);
+    }
+  } catch(e){}
+}
+
+function receberComprovanteCompartilhado(file){
+  // Navegar para aba importar e processar
+  navTo('imp', document.getElementById('bnav-imp'));
+  selImpTipo('comprovante');
+  // Pequeno delay para garantir que o DOM está pronto
+  setTimeout(()=>{
+    const status = document.getElementById('comp-status');
+    if(status){ status.style.display=''; status.textContent='✨ Processando comprovante compartilhado...'; }
+    processarBase64Comprovante(file.base64, file.mediaType, file.name||'comprovante');
+  }, 400);
 }
 
 
@@ -4085,3 +4160,451 @@ function copiarLink(){
 </script>
 </body>
 </html>
+<script>
+// Injeta no final — sobrescreve lancHTML e adiciona funções de seleção múltipla
+
+// ── ESTADO DE SELEÇÃO ────────────────────────────────────────────────────────
+let modoSelecao = false;
+let lancsSelecionados = new Set();
+let _longPressTimer = null;
+
+function entrarModoSelecao(id){
+  modoSelecao = true;
+  lancsSelecionados = new Set([id]);
+  document.getElementById('lanc-list').querySelector('.card')?.classList.add('modo-selecao');
+  atualizarBarraSelecao();
+  atualizarChecks();
+}
+
+function sairModoSelecao(){
+  modoSelecao = false;
+  lancsSelecionados.clear();
+  document.getElementById('lanc-list').querySelector('.card')?.classList.remove('modo-selecao');
+  document.getElementById('barra-selecao').classList.remove('ativa');
+  document.querySelectorAll('.lanc-item').forEach(el => el.classList.remove('selecionado'));
+}
+
+function toggleSelecao(id){
+  if(lancsSelecionados.has(id)) lancsSelecionados.delete(id);
+  else lancsSelecionados.add(id);
+  if(lancsSelecionados.size === 0){ sairModoSelecao(); return; }
+  atualizarBarraSelecao();
+  atualizarChecks();
+}
+
+function atualizarBarraSelecao(){
+  const n = lancsSelecionados.size;
+  document.getElementById('barra-selecao-info').textContent = `${n} selecionado${n !== 1 ? 's' : ''}`;
+  document.getElementById('barra-selecao').classList.toggle('ativa', n > 0);
+}
+
+function atualizarChecks(){
+  document.querySelectorAll('.lanc-item').forEach(el => {
+    const id = el.dataset.id;
+    el.classList.toggle('selecionado', lancsSelecionados.has(id));
+    const chk = el.querySelector('.lanc-check');
+    if(chk) chk.textContent = lancsSelecionados.has(id) ? '✓' : '';
+  });
+}
+
+function deletarSelecionados(){
+  const ids = [...lancsSelecionados];
+  if(!ids.length) return;
+  const n = ids.length;
+  const modal = document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.innerHTML=`
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center">
+      <div style="font-size:32px;margin-bottom:12px">🗑</div>
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Apagar ${n} lançamento${n!==1?'s'}?</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6">Essa ação não pode ser desfeita.</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="confirmarDeleteMultiplo(${JSON.stringify(ids)});this.closest('div[style*=fixed]').remove()"
+          style="padding:14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">
+          Sim, apagar ${n > 1 ? 'todos' : ''}
+        </button>
+        <button onclick="this.closest('div[style*=fixed]').remove()"
+          style="padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+          Cancelar
+        </button>
+      </div>
+    </div>`;
+  modal.onclick=(e)=>{if(e.target===modal)modal.remove();};
+  document.body.appendChild(modal);
+}
+
+function confirmarDeleteMultiplo(ids){
+  const idsSet = new Set(ids);
+  Object.keys(DB.lancamentos).forEach(ym=>{
+    DB.lancamentos[ym] = DB.lancamentos[ym].filter(l => !idsSet.has(l.id));
+  });
+  dbSave();
+  sairModoSelecao();
+  showToast(`${ids.length} lançamento${ids.length!==1?'s':''} apagado${ids.length!==1?'s':''} ✓`);
+  if(currentTab==='inicio') renderInicio();
+  if(currentTab==='lanc')   renderLanc();
+}
+
+// Sobrescrever lancHTML para incluir long press e checkbox
+const _lancHTMLOriginal = lancHTML;
+lancHTML = function(l){
+  const cat = DB.categorias.find(c=>c.id===l.catId)||{icone:'💸',nome:'Outros',cor:'#64748b'};
+  const dataFmt = l.data ? new Date(l.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
+  const parcInfo = l.parcTotal>1 ? ` · ${l.parcAtual}/${l.parcTotal}` : '';
+  return `<div class="lanc-item${lancsSelecionados.has(l.id)?' selecionado':''}"
+    data-id="${l.id}"
+    ontouchstart="_lpStart('${l.id}',event)"
+    ontouchend="_lpEnd()"
+    ontouchcancel="_lpEnd()"
+    ontouchmove="_lpEnd()"
+    onmousedown="_lpStart('${l.id}',event)"
+    onmouseup="_lpEnd()"
+    onmouseleave="_lpEnd()"
+    onclick="_lancClick('${l.id}',event)">
+    <div class="lanc-check">${lancsSelecionados.has(l.id)?'✓':''}</div>
+    <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
+    <div class="lanc-info">
+      <div class="lanc-desc">${l.desc}</div>
+      <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt}</div>
+    </div>
+    <div class="lanc-val ${l.tipo}">${l.tipo==='rec'?'+':'-'}${fmtV(l.valor)}</div>
+  </div>`;
+};
+
+function _lpStart(id, e){
+  _lpEnd();
+  _longPressTimer = setTimeout(()=>{
+    _longPressTimer = null;
+    navigator.vibrate && navigator.vibrate(40);
+    if(!modoSelecao) entrarModoSelecao(id);
+    else toggleSelecao(id);
+  }, 500);
+}
+function _lpEnd(){
+  if(_longPressTimer){ clearTimeout(_longPressTimer); _longPressTimer = null; }
+}
+function _lancClick(id, e){
+  if(_longPressTimer) return; // vai ser tratado pelo long press
+  if(modoSelecao){ e.preventDefault(); e.stopPropagation(); toggleSelecao(id); return; }
+  editLanc(id);
+}
+
+// Sair do modo seleção ao trocar de aba
+const _navToOriginal = navTo;
+navTo = function(tab, btn){
+  if(modoSelecao) sairModoSelecao();
+  _navToOriginal(tab, btn);
+};
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// FILTRO DE CATEGORIAS — Lançamentos e Relatórios
+// ══════════════════════════════════════════════════════════════════════════════
+
+function renderFiltroCategoriasLanc(){
+  const wrap = document.getElementById('lanc-cat-filter-wrap');
+  if(!wrap) return;
+  const cats = DB.categorias;
+  const chips = [
+    `<button onclick="setLancCatFiltro('todas')" style="flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px solid ${lancCatFiltro==='todas'?'#6366f1':'#334155'};background:${lancCatFiltro==='todas'?'rgba(99,102,241,.15)':'var(--s2)'};color:${lancCatFiltro==='todas'?'#a78bfa':'#94a3b8'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">Todas</button>`
+  ];
+  cats.forEach(c=>{
+    const sel = lancCatFiltro === c.id;
+    chips.push(`<button onclick="setLancCatFiltro('${c.id}')" style="flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px solid ${sel?c.cor:'#334155'};background:${sel?c.cor+'22':'var(--s2)'};color:${sel?c.cor:'#94a3b8'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">${c.icone} ${c.nome}</button>`);
+  });
+  wrap.innerHTML = chips.join('');
+}
+
+function setLancCatFiltro(catId){
+  lancCatFiltro = catId;
+  renderFiltroCategoriasLanc();
+  renderLanc();
+}
+
+// Sobrescrever renderLanc para aplicar filtro de categoria
+const _renderLancOriginal = renderLanc;
+renderLanc = function(){
+  renderFiltroCategoriasLanc();
+  const lancs = getLancs(currentMes)
+    .filter(l => lancFiltro==='todos' || l.tipo===lancFiltro)
+    .filter(l => lancCatFiltro==='todas' || l.catId===lancCatFiltro)
+    .sort((a,b)=>b.data.localeCompare(a.data));
+  document.getElementById('lanc-list').innerHTML = lancs.length
+    ? '<div class="card" style="padding:4px 16px">'+lancs.map(l=>lancHTML(l)).join('')+'</div>'
+    : '<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">Nenhum lançamento</div><div class="empty-sub">'+(lancCatFiltro!=='todas'?'Nenhum lançamento nesta categoria.':'Toque em ＋ ou importe um extrato.')+'</div></div>';
+};
+
+// Filtro de categorias nos Relatórios — injeta chips antes do rel-content
+const _renderRelOriginal = renderRel;
+renderRel = function(){
+  _renderRelOriginal();
+  // Injeta barra de filtro de categorias acima do rel-content
+  let filterBar = document.getElementById('rel-cat-filter-bar');
+  const relContent = document.getElementById('rel-content');
+  if(!filterBar){
+    filterBar = document.createElement('div');
+    filterBar.id = 'rel-cat-filter-bar';
+    filterBar.style.cssText = 'display:flex;gap:6px;overflow-x:auto;padding:0 0 10px;scrollbar-width:none;margin-bottom:4px';
+    relContent.parentElement.insertBefore(filterBar, relContent);
+  }
+  const cats = DB.categorias.filter(c=>c.tipo==='desp'||c.tipo==='both');
+  const chips = [
+    `<button onclick="setRelCatFiltro('todas')" style="flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px solid ${relCatFiltro==='todas'?'#6366f1':'#334155'};background:${relCatFiltro==='todas'?'rgba(99,102,241,.15)':'var(--s2)'};color:${relCatFiltro==='todas'?'#a78bfa':'#94a3b8'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">Todas</button>`
+  ];
+  cats.forEach(c=>{
+    const sel = relCatFiltro === c.id;
+    chips.push(`<button onclick="setRelCatFiltro('${c.id}')" style="flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px solid ${sel?c.cor:'#334155'};background:${sel?c.cor+'22':'var(--s2)'};color:${sel?c.cor:'#94a3b8'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">${c.icone} ${c.nome}</button>`);
+  });
+  filterBar.innerHTML = chips.join('');
+
+  // Aplicar filtro de categoria no conteúdo dos relatórios
+  if(relCatFiltro !== 'todas'){
+    const meses = getMeses(periodMode);
+    const cat = DB.categorias.find(c=>c.id===relCatFiltro);
+    const lancs = meses.flatMap(ym=>getLancs(ym)).filter(l=>l.catId===relCatFiltro);
+    const total = lancs.reduce((s,l)=>s+l.valor, 0);
+    // Inserir resumo filtrado no topo do rel-content
+    relContent.insertAdjacentHTML('afterbegin', `
+      <div style="background:${cat.cor}15;border:1px solid ${cat.cor}40;border-radius:14px;padding:14px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+        <div style="font-size:28px">${cat.icone}</div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:${cat.cor};text-transform:uppercase;letter-spacing:.05em">${cat.nome}</div>
+          <div style="font-size:22px;font-weight:800;font-family:'DM Mono',monospace;color:var(--rd)">${fmtV(total)}</div>
+          <div style="font-size:11px;color:var(--mu);margin-top:2px">${lancs.length} lançamento${lancs.length!==1?'s':''}</div>
+        </div>
+      </div>`);
+  }
+};
+
+function setRelCatFiltro(catId){
+  relCatFiltro = catId;
+  renderRel();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LEITURA DE COMPROVANTES POR IA
+// ══════════════════════════════════════════════════════════════════════════════
+
+function handleDropComp(e){
+  e.preventDefault();
+  handleDragLeave();
+  lerComprovante(e.dataTransfer.files[0]);
+}
+
+function handleComprovante(e){
+  lerComprovante(e.target.files[0]);
+}
+
+async function lerComprovante(file){
+  if(!file) return;
+  const status = document.getElementById('comp-status');
+  status.style.display = '';
+  status.textContent = '✨ Lendo comprovante...';
+
+  try {
+    // Converter arquivo para base64
+    const base64 = await new Promise((res, rej)=>{
+      const r = new FileReader();
+      r.onload = ()=> res(r.result.split(',')[1]);
+      r.onerror = ()=> rej(new Error('Erro ao ler arquivo'));
+      r.readAsDataURL(file);
+    });
+
+    const isImage = file.type.startsWith('image/');
+    const isPDF   = file.type === 'application/pdf';
+
+    const cats = DB.categorias.map(c=>c.nome).join(', ');
+    const promptTexto = `Analise este comprovante de pagamento e extraia as informações.
+
+CATEGORIAS DISPONÍVEIS: ${cats}
+
+Retorne APENAS JSON válido:
+{
+  "tipo": "SAIDA" ou "ENTRADA",
+  "valor": 250.00,
+  "descricao": "descrição curta do pagamento (ex: PIX para João Silva, Boleto Energia Elétrica)",
+  "data": "DD/MM/AAAA",
+  "categoria": "nome da categoria mais adequada",
+  "nota": "informação adicional útil (banco, chave PIX, etc.) — máx 60 chars"
+}
+
+Se não conseguir identificar algum campo, use null.`;
+
+    let resposta;
+
+    if(isImage){
+      // Enviar imagem direto para a IA
+      const body = {
+        model: 'claude-sonnet-4-6',
+        max_tokens: 500,
+        messages:[{
+          role:'user',
+          content:[
+            { type:'image', source:{ type:'base64', media_type: file.type, data: base64 }},
+            { type:'text',  text: promptTexto }
+          ]
+        }]
+      };
+      const resp = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key': IA_API_KEY !== 'SUA_API_KEY_AQUI' ? IA_API_KEY : undefined},
+        body: JSON.stringify(body)
+      });
+      // Fallback para proxy
+      if(!resp || resp.status === 401){
+        const r2 = await fetch(IA_PROXY,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ prompt: promptTexto, sistemPrompt:'Você lê comprovantes financeiros. Retorne apenas JSON válido.', maxTokens:500, image: { data: base64, mediaType: file.type } })
+        });
+        const d2 = await r2.json();
+        resposta = d2.content?.map(b=>b.text||'').join('') || '';
+      } else {
+        const d = await resp.json();
+        resposta = d.content?.map(b=>b.text||'').join('') || '';
+      }
+    } else if(isPDF){
+      // PDF: usar chamarIA com documento base64
+      resposta = await chamarIA(promptTexto + '\n\n[Documento PDF anexado]', 'Você lê comprovantes financeiros. Retorne apenas JSON válido.', 500);
+    } else {
+      throw new Error('Formato não suportado. Use imagem (JPG, PNG) ou PDF.');
+    }
+
+    // Parsear resposta
+    const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    let dados;
+    try { dados = JSON.parse(json); }
+    catch {
+      const m = json.match(/\{[\s\S]*\}/);
+      if(m) dados = JSON.parse(m[0]);
+      else throw new Error('Não foi possível identificar os dados do comprovante.');
+    }
+
+    if(!dados.valor) throw new Error('Valor não identificado no comprovante.');
+
+    status.style.display = 'none';
+
+    // Pré-preencher drawer de lançamento
+    const cat = DB.categorias.find(c => c.nome.toLowerCase() === (dados.categoria||'').toLowerCase())
+      || DB.categorias.find(c=>c.nome==='Outros gastos');
+
+    openDrawer('drawer-lanc');
+    document.getElementById('drawer-lanc-title').textContent = '✨ Lançamento do comprovante';
+    document.getElementById('lanc-edit-id').value = '';
+    const dw = document.getElementById('lanc-delete-wrap');
+    if(dw) dw.style.display = 'none';
+
+    document.getElementById('lanc-valor').value = Math.abs(dados.valor);
+    document.getElementById('lanc-desc').value  = dados.descricao || '';
+    document.getElementById('lanc-nota').value  = dados.nota || 'Importado via comprovante';
+    if(dados.data){
+      const p = dados.data.split('/');
+      if(p.length===3) document.getElementById('lanc-data').value = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    }
+    selLancTipo(dados.tipo==='ENTRADA' ? 'rec' : 'desp');
+    renderLancCats();
+    if(cat) document.getElementById('lanc-cat').value = cat.id;
+
+    showToast('✨ Comprovante lido! Confira e salve.');
+
+    // Reset input para permitir novo comprovante
+    document.getElementById('iFileComp').value = '';
+
+  } catch(err){
+    status.textContent = '⚠️ ' + err.message;
+    showToast('Erro: ' + err.message.slice(0,60));
+  }
+}
+</script>
+<script>
+// ── PROCESSAR COMPROVANTE VIA BASE64 (vindo do share_target) ─────────────────
+async function processarBase64Comprovante(base64, mediaType, nome){
+  const status = document.getElementById('comp-status');
+  if(status){ status.style.display=''; status.textContent='✨ Lendo comprovante...'; }
+
+  try {
+    const cats = DB.categorias.map(c=>c.nome).join(', ');
+    const promptTexto = `Analise este comprovante de pagamento e extraia as informações.
+
+CATEGORIAS DISPONÍVEIS: ${cats}
+
+Retorne APENAS JSON válido:
+{
+  "tipo": "SAIDA" ou "ENTRADA",
+  "valor": 250.00,
+  "descricao": "descrição curta (ex: PIX para João Silva, Boleto Energia)",
+  "data": "DD/MM/AAAA",
+  "categoria": "nome da categoria mais adequada",
+  "nota": "informação adicional útil — máx 60 chars"
+}`;
+
+    let resposta;
+    const isImage = mediaType.startsWith('image/');
+
+    if(isImage && IA_API_KEY !== 'SUA_API_KEY_AQUI'){
+      const body = {
+        model:'claude-sonnet-4-6', max_tokens:500,
+        messages:[{ role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type: mediaType, data: base64 }},
+          { type:'text',  text: promptTexto }
+        ]}]
+      };
+      const resp = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key': IA_API_KEY},
+        body: JSON.stringify(body)
+      });
+      const d = await resp.json();
+      resposta = d.content?.map(b=>b.text||'').join('') || '';
+    } else {
+      // Proxy Netlify (suporta imagem via campo extra)
+      const r = await fetch(IA_PROXY,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          prompt: promptTexto,
+          sistemPrompt:'Você lê comprovantes financeiros. Retorne apenas JSON válido.',
+          maxTokens: 500,
+          ...(isImage ? { image: { data: base64, mediaType } } : {})
+        })
+      });
+      const d = await r.json();
+      resposta = d.content?.map(b=>b.text||'').join('') || '';
+    }
+
+    const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    let dados;
+    try { dados = JSON.parse(json); }
+    catch { const m = json.match(/\{[\s\S]*\}/); if(m) dados = JSON.parse(m[0]); else throw new Error('Não foi possível ler o comprovante.'); }
+
+    if(!dados.valor) throw new Error('Valor não identificado no comprovante.');
+
+    if(status) status.style.display = 'none';
+
+    const cat = DB.categorias.find(c => c.nome.toLowerCase() === (dados.categoria||'').toLowerCase())
+      || DB.categorias.find(c=>c.nome==='Outros gastos');
+
+    openDrawer('drawer-lanc');
+    document.getElementById('drawer-lanc-title').textContent = '✨ Comprovante compartilhado';
+    document.getElementById('lanc-edit-id').value = '';
+    const dw = document.getElementById('lanc-delete-wrap');
+    if(dw) dw.style.display = 'none';
+    document.getElementById('lanc-valor').value = Math.abs(dados.valor);
+    document.getElementById('lanc-desc').value  = dados.descricao || '';
+    document.getElementById('lanc-nota').value  = dados.nota || 'Importado via comprovante';
+    if(dados.data){
+      const p = dados.data.split('/');
+      if(p.length===3) document.getElementById('lanc-data').value = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    }
+    selLancTipo(dados.tipo==='ENTRADA'?'rec':'desp');
+    renderLancCats();
+    if(cat) document.getElementById('lanc-cat').value = cat.id;
+
+    showToast('✨ Comprovante lido! Confira e salve.');
+
+  } catch(err){
+    if(status){ status.textContent = '⚠️ '+err.message; }
+    showToast('Erro: '+err.message.slice(0,60));
+  }
+}
+</script>
