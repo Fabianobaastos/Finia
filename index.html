@@ -438,6 +438,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <!-- ── TAB: INÍCIO ─────────────────────────────────────────────────── -->
   <div class="tab-content active page" id="tab-inicio">
     <div id="hero-wrap"></div>
+    <div id="uso-wrap"></div>
     <div id="insight-ai-wrap"></div>
     <div id="kpis-wrap"></div>
 
@@ -1377,7 +1378,7 @@ function renderInicio(){
   })();
   const txEcon = rec>0 ? Math.max(0,(sal/rec)*100) : 0;
 
-  document.getElementById('hero-wrap').insertAdjacentHTML('afterend', usoHtml);
+  const usoWrap = document.getElementById('uso-wrap'); if(usoWrap) usoWrap.innerHTML = usoHtml;
   document.getElementById('kpis-wrap').innerHTML=`
     <div class="kpi-grid">
       <div class="kpi">
@@ -3196,7 +3197,11 @@ document.querySelectorAll('#ob-banco-chips .chip').forEach(c=>{
 // ── SISTEMA DE IA ─────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
 
-const IA_PROXY = '/.netlify/functions/ai-parser';
+// Configuração da IA
+// Para ativar: substitua 'SUA_API_KEY_AQUI' pela sua chave da Anthropic
+// Obtenha em: console.anthropic.com/api-keys
+const IA_API_KEY = 'SUA_API_KEY_AQUI';
+const IA_PROXY   = '/.netlify/functions/ai-parser'; // usado quando disponível
 let chatHistorico = [];
 let chatAberto    = false;
 let iaSendindo    = false;
@@ -3239,18 +3244,47 @@ CATEGORIAS DISPONÍVEIS: ${DB.categorias.map(c=>c.nome).join(', ')}`;
 
 // ── Chamada à API via proxy ───────────────────────────────────────────────────
 async function chamarIA(prompt, sistemPrompt, maxTokens = 800){
-  const resp = await fetch(IA_PROXY, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ prompt, sistemPrompt, maxTokens })
-  });
-  if(!resp.ok){
-    const err = await resp.text();
-    throw new Error(`Erro ${resp.status}: ${err.slice(0,150)}`);
+  // Tentar proxy Netlify primeiro
+  const usarProxy = IA_API_KEY === 'SUA_API_KEY_AQUI';
+
+  if(usarProxy){
+    // Usar proxy (Netlify Function)
+    const resp = await fetch(IA_PROXY, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, sistemPrompt, maxTokens })
+    });
+    if(!resp.ok){
+      const err = await resp.text();
+      throw new Error(`Proxy indisponível (${resp.status}). Configure a Netlify Function ou insira sua API key no código.`);
+    }
+    const data = await resp.json();
+    if(data.error) throw new Error(data.error);
+    return data.content?.map(b=>b.text||'').join('') || '';
+  } else {
+    // Chamada direta com API key (desenvolvimento/teste)
+    const body = {
+      model: 'claude-sonnet-4-6',
+      max_tokens: Math.min(maxTokens, 4000),
+      messages: [{ role: 'user', content: prompt }]
+    };
+    if(sistemPrompt) body.system = sistemPrompt;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': IA_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(body)
+    });
+    if(!resp.ok){
+      const err = await resp.text();
+      throw new Error(`API ${resp.status}: ${err.slice(0,150)}`);
+    }
+    const data = await resp.json();
+    return data.content?.map(b=>b.text||'').join('') || '';
   }
-  const data = await resp.json();
-  if(data.error) throw new Error(data.error);
-  return data.content?.map(b=>b.text||'').join('') || '';
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
