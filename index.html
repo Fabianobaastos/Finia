@@ -3845,11 +3845,20 @@ document.addEventListener('click', e=>{
 // Registrar Service Worker para PWA (só funciona em HTTPS ou localhost)
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
   window.addEventListener('load', async ()=>{
-    // Registrar SW externo (necessário para share_target funcionar)
-    try {
-      await navigator.serviceWorker.register('/sw.js');
-      console.log('Finia SW registrado');
-    } catch(e){ console.warn('SW:', e); }
+    // iOS Safari tem bugs com SW interceptando fetch — desregistrar no iOS
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if(isIOS){
+      // Desregistrar qualquer SW existente no iOS
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for(const reg of regs) await reg.unregister();
+      // No iOS não registrar SW (share_target não funciona de qualquer forma)
+    } else {
+      // Android/Desktop — registrar SW com share_target
+      try {
+        await navigator.serviceWorker.register('/sw.js');
+        console.log('Finia SW registrado');
+      } catch(e){ console.warn('SW:', e); }
+    }
 
     // Manifest externo com share_target
     const link = document.createElement('link');
@@ -4432,40 +4441,23 @@ Se não conseguir identificar algum campo, use null.`;
 
     let resposta;
 
+    // Sempre usar o proxy Netlify — evita CORS e funciona em todos os dispositivos
     if(isImage){
-      // Enviar imagem direto para a IA
-      const body = {
-        model: 'claude-sonnet-4-6',
-        max_tokens: 500,
-        messages:[{
-          role:'user',
-          content:[
-            { type:'image', source:{ type:'base64', media_type: file.type, data: base64 }},
-            { type:'text',  text: promptTexto }
-          ]
-        }]
-      };
-      const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      const r = await fetch(IA_PROXY, {
         method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key': IA_API_KEY !== 'SUA_API_KEY_AQUI' ? IA_API_KEY : undefined},
-        body: JSON.stringify(body)
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          prompt: promptTexto,
+          sistemPrompt: 'Você lê comprovantes financeiros brasileiros. Retorne apenas JSON válido, sem markdown.',
+          maxTokens: 500,
+          image: { data: base64, mediaType: file.type }
+        })
       });
-      // Fallback para proxy
-      if(!resp || resp.status === 401){
-        const r2 = await fetch(IA_PROXY,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ prompt: promptTexto, sistemPrompt:'Você lê comprovantes financeiros. Retorne apenas JSON válido.', maxTokens:500, image: { data: base64, mediaType: file.type } })
-        });
-        const d2 = await r2.json();
-        resposta = d2.content?.map(b=>b.text||'').join('') || '';
-      } else {
-        const d = await resp.json();
-        resposta = d.content?.map(b=>b.text||'').join('') || '';
-      }
+      if(!r.ok) throw new Error('Erro ao processar comprovante ('+r.status+')');
+      const d = await r.json();
+      resposta = d.content?.map(b=>b.text||'').join('') || d.text || '';
     } else if(isPDF){
-      // PDF: usar chamarIA com documento base64
-      resposta = await chamarIA(promptTexto + '\n\n[Documento PDF anexado]', 'Você lê comprovantes financeiros. Retorne apenas JSON válido.', 500);
+      resposta = await chamarIA(promptTexto, 'Você lê comprovantes financeiros brasileiros. Retorne apenas JSON válido, sem markdown.', 500);
     } else {
       throw new Error('Formato não suportado. Use imagem (JPG, PNG) ou PDF.');
     }
