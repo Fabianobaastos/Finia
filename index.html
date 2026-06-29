@@ -132,12 +132,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
 .lanc-item .lanc-check{width:22px;height:22px;border-radius:50%;border:2px solid #334155;display:none;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;transition:all .15s;background:transparent}
 .modo-selecao .lanc-item .lanc-check{display:flex}
 .lanc-item.selecionado .lanc-check{border-color:#6366f1;background:#6366f1;color:#fff}
-.barra-selecao{position:fixed;bottom:calc(68px + var(--safe-b));left:0;right:0;z-index:150;background:rgba(15,23,42,.97);backdrop-filter:blur(16px);border-top:1px solid rgba(99,102,241,.3);padding:12px 18px;display:none;align-items:center;justify-content:space-between;gap:12px}
+.barra-selecao{position:fixed;bottom:calc(68px + var(--safe-b));left:0;right:0;z-index:200;background:#0f172a;border-top:2px solid #6366f1;padding:12px 18px;display:none;align-items:center;justify-content:space-between;gap:12px;pointer-events:auto}
 .barra-selecao.ativa{display:flex}
 .barra-selecao-info{font-size:13px;font-weight:600;color:#a78bfa}
-.barra-selecao-acoes{display:flex;gap:10px}
-.btn-sel-cancel{padding:9px 16px;border-radius:10px;border:1.5px solid #334155;background:transparent;color:#94a3b8;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.btn-sel-delete{padding:9px 16px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px}
+.barra-selecao-acoes{display:flex;gap:8px;pointer-events:auto}
+.btn-sel-cancel{padding:9px 14px;border-radius:10px;border:1.5px solid #334155;background:#1e293b;color:#94a3b8;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent}
+.btn-sel-move{padding:9px 14px;border-radius:10px;border:1.5px solid #6366f1;background:#1e293b;color:#a78bfa;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent}
+.btn-sel-delete{padding:9px 14px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;pointer-events:auto;-webkit-tap-highlight-color:transparent}
 .lanc-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .lanc-info{flex:1;min-width:0}
 .lanc-desc{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -727,9 +728,9 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <div class="barra-selecao" id="barra-selecao">
   <div class="barra-selecao-info" id="barra-selecao-info">0 selecionados</div>
   <div class="barra-selecao-acoes">
-    <button class="btn-sel-cancel" onclick="sairModoSelecao()">✕</button>
-    <button class="btn-sel-cancel" onclick="moverCategoriaSelecionados()" style="color:#a78bfa;border-color:#6366f1">📂 Mover</button>
-    <button class="btn-sel-delete" onclick="deletarSelecionados()">🗑 Apagar</button>
+    <button class="btn-sel-cancel" ontouchend="sairModoSelecao()" onclick="sairModoSelecao()">✕</button>
+    <button class="btn-sel-move" ontouchend="moverCategoriaSelecionados()" onclick="moverCategoriaSelecionados()">📂 Mover</button>
+    <button class="btn-sel-delete" ontouchend="deletarSelecionados()" onclick="deletarSelecionados()">🗑 Apagar</button>
   </div>
 </div>
 
