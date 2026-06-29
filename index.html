@@ -118,8 +118,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
 
 /* ── LISTA LANÇAMENTOS ──────────────────────────────────────────────────── */
 .lanc-group-title{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.07em;padding:6px 0 8px}
-.lanc-item{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid rgba(51,65,85,.4);cursor:pointer;transition:background .15s,opacity .15s;border-radius:8px;margin:0 -4px}
+.lanc-item{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid rgba(51,65,85,.4);transition:background .15s;border-radius:8px;margin:0 -4px}
 .lanc-item:last-child{border-bottom:none}
+.lanc-item.lanc-sel{background:rgba(99,102,241,.1)}
+.lanc-cb{display:flex;align-items:center;justify-content:center;padding:4px;flex-shrink:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.lanc-cb-box{width:20px;height:20px;border-radius:6px;border:2px solid #334155;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;transition:all .15s;background:transparent;flex-shrink:0}
+.lanc-cb-on{border-color:#6366f1!important;background:#6366f1!important}
+.lanc-ico{cursor:pointer}
+.lanc-info{cursor:pointer}
+.lanc-val{cursor:pointer}
 .lanc-item:active{opacity:.7}
 .lanc-item.selecionado{background:rgba(99,102,241,.12);border-bottom-color:rgba(99,102,241,.2)}
 .lanc-item .lanc-check{width:22px;height:22px;border-radius:50%;border:2px solid #334155;display:none;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;transition:all .15s;background:transparent}
@@ -720,7 +727,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <div class="barra-selecao" id="barra-selecao">
   <div class="barra-selecao-info" id="barra-selecao-info">0 selecionados</div>
   <div class="barra-selecao-acoes">
-    <button class="btn-sel-cancel" onclick="sairModoSelecao()">Cancelar</button>
+    <button class="btn-sel-cancel" onclick="sairModoSelecao()">✕</button>
+    <button class="btn-sel-cancel" onclick="moverCategoriaSelecionados()" style="color:#a78bfa;border-color:#6366f1">📂 Mover</button>
     <button class="btn-sel-delete" onclick="deletarSelecionados()">🗑 Apagar</button>
   </div>
 </div>
@@ -4172,57 +4180,58 @@ function copiarLink(){
 <script>
 // Injeta no final — sobrescreve lancHTML e adiciona funções de seleção múltipla
 
-// ── ESTADO DE SELEÇÃO ────────────────────────────────────────────────────────
-let modoSelecao = false;
+// ── SELEÇÃO MÚLTIPLA COM CHECKBOX ────────────────────────────────────────────
 let lancsSelecionados = new Set();
-let _longPressTimer = null;
 
-function entrarModoSelecao(id){
-  modoSelecao = true;
-  lancsSelecionados = new Set([id]);
-  aplicarModoSelecaoDOM();
-  atualizarBarraSelecao();
-  atualizarChecks();
+// Sobrescrever lancHTML — checkbox sempre visível à esquerda
+lancHTML = function(l){
+  const cat = DB.categorias.find(c=>c.id===l.catId)||{icone:'💸',nome:'Outros',cor:'#64748b'};
+  const dataFmt = l.data ? new Date(l.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
+  const parcInfo = l.parcTotal>1 ? ` · ${l.parcAtual}/${l.parcTotal}` : '';
+  const sel = lancsSelecionados.has(l.id);
+  return `<div class="lanc-item${sel?' lanc-sel':''}" data-id="${l.id}">
+    <div class="lanc-cb" onclick="event.stopPropagation();toggleSelLanc('${l.id}')">
+      <div class="lanc-cb-box${sel?' lanc-cb-on':''}">${sel?'✓':''}</div>
+    </div>
+    <div class="lanc-ico" style="background:${cat.cor}22" onclick="editLanc('${l.id}')">${cat.icone}</div>
+    <div class="lanc-info" onclick="editLanc('${l.id}')">
+      <div class="lanc-desc">${l.desc}</div>
+      <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt}</div>
+    </div>
+    <div class="lanc-val ${l.tipo}" onclick="editLanc('${l.id}')">${l.tipo==='rec'?'+':'-'}${fmtV(l.valor)}</div>
+  </div>`;
+};
+
+function toggleSelLanc(id){
+  if(lancsSelecionados.has(id)) lancsSelecionados.delete(id);
+  else lancsSelecionados.add(id);
+  // Atualizar visual do item sem re-renderizar tudo
+  const el = document.querySelector(`.lanc-item[data-id="${id}"]`);
+  if(el){
+    const sel = lancsSelecionados.has(id);
+    el.classList.toggle('lanc-sel', sel);
+    const box = el.querySelector('.lanc-cb-box');
+    if(box){ box.classList.toggle('lanc-cb-on', sel); box.textContent = sel ? '✓' : ''; }
+  }
+  atualizarBarraLote();
+}
+
+function atualizarBarraLote(){
+  const n = lancsSelecionados.size;
+  const barra = document.getElementById('barra-selecao');
+  const info  = document.getElementById('barra-selecao-info');
+  if(info) info.textContent = `${n} selecionado${n!==1?'s':''}`;
+  if(barra) barra.classList.toggle('ativa', n > 0);
 }
 
 function sairModoSelecao(){
-  modoSelecao = false;
   lancsSelecionados.clear();
-  document.getElementById('lanc-list').querySelector('.card')?.classList.remove('modo-selecao');
-  document.getElementById('barra-selecao').classList.remove('ativa');
-  document.querySelectorAll('.lanc-item').forEach(el => el.classList.remove('selecionado'));
-}
-
-function aplicarModoSelecaoDOM(){
-  // Garante que a classe modo-selecao está no card mesmo após re-render
-  const card = document.getElementById('lanc-list').querySelector('.card');
-  if(card) card.classList.add('modo-selecao');
-}
-
-function toggleSelecao(id){
-  if(lancsSelecionados.has(id)) lancsSelecionados.delete(id);
-  else lancsSelecionados.add(id);
-  if(lancsSelecionados.size === 0){ sairModoSelecao(); return; }
-  aplicarModoSelecaoDOM();
-  atualizarBarraSelecao();
-  atualizarChecks();
-}
-
-function atualizarBarraSelecao(){
-  const n = lancsSelecionados.size;
-  document.getElementById('barra-selecao-info').textContent = `${n} selecionado${n !== 1 ? 's' : ''}`;
-  document.getElementById('barra-selecao').classList.toggle('ativa', n > 0);
-}
-
-function atualizarChecks(){
-  // Reaplicar modo-selecao no card (pode ter sido re-renderizado)
-  aplicarModoSelecaoDOM();
-  document.querySelectorAll('.lanc-item').forEach(el => {
-    const id = el.dataset.id;
-    el.classList.toggle('selecionado', lancsSelecionados.has(id));
-    const chk = el.querySelector('.lanc-check');
-    if(chk) chk.textContent = lancsSelecionados.has(id) ? '✓' : '';
+  document.querySelectorAll('.lanc-item.lanc-sel').forEach(el=>{
+    el.classList.remove('lanc-sel');
+    const box = el.querySelector('.lanc-cb-box');
+    if(box){ box.classList.remove('lanc-cb-on'); box.textContent=''; }
   });
+  atualizarBarraLote();
 }
 
 function deletarSelecionados(){
@@ -4234,14 +4243,14 @@ function deletarSelecionados(){
   modal.innerHTML=`
     <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center">
       <div style="font-size:32px;margin-bottom:12px">🗑</div>
-      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Apagar ${n} lançamento${n!==1?'s'}?</div>
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Apagar ${n} lançamento${n!==1?'s':''}?</div>
       <div style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6">Essa ação não pode ser desfeita.</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <button onclick="confirmarDeleteMultiplo(${JSON.stringify(ids)});this.closest('div[style*=fixed]').remove()"
+        <button onclick="confirmarDeleteLote(${JSON.stringify(ids)});this.closest('[style*=fixed]').remove()"
           style="padding:14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">
-          Sim, apagar ${n > 1 ? 'todos' : ''}
+          Sim, apagar${n>1?' todos':''}
         </button>
-        <button onclick="this.closest('div[style*=fixed]').remove()"
+        <button onclick="this.closest('[style*=fixed]').remove()"
           style="padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
           Cancelar
         </button>
@@ -4251,78 +4260,60 @@ function deletarSelecionados(){
   document.body.appendChild(modal);
 }
 
-function confirmarDeleteMultiplo(ids){
+function confirmarDeleteLote(ids){
   const idsSet = new Set(ids);
   Object.keys(DB.lancamentos).forEach(ym=>{
-    DB.lancamentos[ym] = DB.lancamentos[ym].filter(l => !idsSet.has(l.id));
+    DB.lancamentos[ym] = DB.lancamentos[ym].filter(l=>!idsSet.has(l.id));
   });
   dbSave();
   sairModoSelecao();
   showToast(`${ids.length} lançamento${ids.length!==1?'s':''} apagado${ids.length!==1?'s':''} ✓`);
-  if(currentTab==='inicio') renderInicio();
-  if(currentTab==='lanc')   renderLanc();
+  renderLanc();
 }
 
-// Sobrescrever lancHTML para incluir long press e checkbox
-const _lancHTMLOriginal = lancHTML;
-lancHTML = function(l){
-  const cat = DB.categorias.find(c=>c.id===l.catId)||{icone:'💸',nome:'Outros',cor:'#64748b'};
-  const dataFmt = l.data ? new Date(l.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
-  const parcInfo = l.parcTotal>1 ? ` · ${l.parcAtual}/${l.parcTotal}` : '';
-  return `<div class="lanc-item${lancsSelecionados.has(l.id)?' selecionado':''}"
-    data-id="${l.id}"
-    ontouchstart="_lpStart('${l.id}',event)"
-    ontouchend="_lpEnd()"
-    ontouchcancel="_lpEnd()"
-    ontouchmove="_lpMove()"
-    onmousedown="_lpStart('${l.id}',event)"
-    onmouseup="_lpEnd()"
-    onmouseleave="_lpEnd()"
-    onclick="_lancClick('${l.id}',event)">
-    <div class="lanc-check">${lancsSelecionados.has(l.id)?'✓':''}</div>
-    <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
-    <div class="lanc-info">
-      <div class="lanc-desc">${l.desc}</div>
-      <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt}</div>
-    </div>
-    <div class="lanc-val ${l.tipo}">${l.tipo==='rec'?'+':'-'}${fmtV(l.valor)}</div>
-  </div>`;
-};
-
-let _lpMoved = false;
-let _lpActivated = false;
-
-function _lpStart(id, e){
-  _lpEnd();
-  _lpMoved = false;
-  _lpActivated = false;
-  _longPressTimer = setTimeout(()=>{
-    _longPressTimer = null;
-    if(_lpMoved) return; // ignorar se houve scroll
-    _lpActivated = true;
-    navigator.vibrate && navigator.vibrate(40);
-    if(!modoSelecao) entrarModoSelecao(id);
-    else toggleSelecao(id);
-  }, 550);
-}
-function _lpMove(){
-  // Só cancela se o movimento for significativo (scroll)
-  _lpMoved = true;
-  _lpEnd();
-}
-function _lpEnd(){
-  if(_longPressTimer){ clearTimeout(_longPressTimer); _longPressTimer = null; }
-}
-function _lancClick(id, e){
-  if(_lpActivated){ _lpActivated = false; return; } // long press já tratou
-  if(modoSelecao){ e.preventDefault(); e.stopPropagation(); toggleSelecao(id); return; }
-  editLanc(id);
+function moverCategoriaSelecionados(){
+  const ids = [...lancsSelecionados];
+  if(!ids.length) return;
+  const cats = DB.categorias;
+  const modal = document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.innerHTML=`
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:24px;max-width:340px;width:100%">
+      <div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:16px">📂 Mover ${ids.length} lançamento${ids.length!==1?'s':''} para...</div>
+      <div style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto">
+        ${cats.map(c=>`
+          <button onclick="confirmarMoverLote(${JSON.stringify(ids)},'${c.id}');this.closest('[style*=fixed]').remove()"
+            style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#f1f5f9;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left">
+            <span style="font-size:20px">${c.icone}</span>
+            <span>${c.nome}</span>
+            <span style="margin-left:auto;font-size:10px;color:#64748b;background:${c.cor}22;padding:2px 8px;border-radius:6px">${c.tipo==='rec'?'receita':'despesa'}</span>
+          </button>`).join('')}
+      </div>
+      <button onclick="this.closest('[style*=fixed]').remove()"
+        style="margin-top:14px;width:100%;padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+        Cancelar
+      </button>
+    </div>`;
+  modal.onclick=(e)=>{if(e.target===modal)modal.remove();};
+  document.body.appendChild(modal);
 }
 
-// Sair do modo seleção ao trocar de aba
+function confirmarMoverLote(ids, catId){
+  const idsSet = new Set(ids);
+  Object.keys(DB.lancamentos).forEach(ym=>{
+    DB.lancamentos[ym].forEach(l=>{ if(idsSet.has(l.id)) l.catId = catId; });
+  });
+  dbSave();
+  sairModoSelecao();
+  const cat = DB.categorias.find(c=>c.id===catId);
+  showToast(`${ids.length} lançamento${ids.length!==1?'s':''} movido${ids.length!==1?'s':''} para ${cat?.nome||'categoria'} ✓`);
+  renderLanc();
+}
+
+// Sair seleção ao trocar aba
 const _navToOriginal = navTo;
 navTo = function(tab, btn){
-  if(modoSelecao) sairModoSelecao();
+  if(lancsSelecionados.size > 0) sairModoSelecao();
   _navToOriginal(tab, btn);
 };
 </script>
