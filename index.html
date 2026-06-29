@@ -1050,20 +1050,35 @@ function renderBadgePro(){
 }
 
 const CATS_DEFAULT = [
-  {id:'c1',nome:'Alimentação',icone:'🍽️',cor:'#f87171',tipo:'desp'},
-  {id:'c2',nome:'Mercado',icone:'🛒',cor:'#fb923c',tipo:'desp'},
-  {id:'c3',nome:'Transporte',icone:'🚗',cor:'#fbbf24',tipo:'desp'},
-  {id:'c4',nome:'Saúde',icone:'💊',cor:'#34d399',tipo:'desp'},
-  {id:'c5',nome:'Moradia',icone:'🏠',cor:'#60a5fa',tipo:'desp'},
-  {id:'c6',nome:'Lazer',icone:'🎬',cor:'#a78bfa',tipo:'desp'},
-  {id:'c7',nome:'Educação',icone:'📚',cor:'#38bdf8',tipo:'desp'},
-  {id:'c8',nome:'Roupas',icone:'👗',cor:'#f472b6',tipo:'desp'},
-  {id:'c9',nome:'Assinaturas',icone:'📱',cor:'#94a3b8',tipo:'desp'},
-  {id:'c10',nome:'Outros gastos',icone:'💸',cor:'#64748b',tipo:'desp'},
-  {id:'c11',nome:'Salário',icone:'💰',cor:'#22d3a5',tipo:'rec'},
-  {id:'c12',nome:'Freelance',icone:'💼',cor:'#818cf8',tipo:'rec'},
-  {id:'c13',nome:'Investimentos',icone:'📈',cor:'#4ade80',tipo:'rec'},
-  {id:'c14',nome:'Outros ganhos',icone:'🎁',cor:'#2dd4bf',tipo:'rec'},
+  // ── DESPESAS ────────────────────────────────────────────────────────────────
+  {id:'c1', nome:'Alimentação',            icone:'🍽️', cor:'#f87171', tipo:'desp'},
+  {id:'c2', nome:'Mercado',                icone:'🛒', cor:'#fb923c', tipo:'desp'},
+  {id:'c3', nome:'Transporte',             icone:'🚗', cor:'#fbbf24', tipo:'desp'},
+  {id:'c4', nome:'Saúde',                  icone:'💊', cor:'#34d399', tipo:'desp'},
+  {id:'c5', nome:'Moradia',                icone:'🏠', cor:'#60a5fa', tipo:'desp'},
+  {id:'c6', nome:'Lazer',                  icone:'🎬', cor:'#a78bfa', tipo:'desp'},
+  {id:'c7', nome:'Educação',               icone:'📚', cor:'#38bdf8', tipo:'desp'},
+  {id:'c8', nome:'Roupas',                 icone:'👗', cor:'#f472b6', tipo:'desp'},
+  {id:'c9', nome:'Assinaturas',            icone:'📱', cor:'#94a3b8', tipo:'desp'},
+  {id:'c15',nome:'Impostos e Taxas',       icone:'🏛️', cor:'#ef4444', tipo:'desp'},
+  {id:'c16',nome:'Serviços',               icone:'🤝', cor:'#8b5cf6', tipo:'desp'},
+  {id:'c17',nome:'Colaboradores',          icone:'👥', cor:'#06b6d4', tipo:'desp'},
+  {id:'c18',nome:'Fornecedores',           icone:'📦', cor:'#f59e0b', tipo:'desp'},
+  {id:'c19',nome:'Tecnologia',             icone:'💻', cor:'#6366f1', tipo:'desp'},
+  {id:'c20',nome:'Beleza e Cuidados',      icone:'💅', cor:'#ec4899', tipo:'desp'},
+  {id:'c21',nome:'Presentes e Doações',    icone:'🎁', cor:'#14b8a6', tipo:'desp'},
+  {id:'c10',nome:'Outros gastos',          icone:'💸', cor:'#64748b', tipo:'desp'},
+  // ── RECEITAS ────────────────────────────────────────────────────────────────
+  {id:'c11',nome:'Salário',                icone:'💰', cor:'#22d3a5', tipo:'rec'},
+  {id:'c12',nome:'Freelance',              icone:'💼', cor:'#818cf8', tipo:'rec'},
+  {id:'c13',nome:'Investimentos',          icone:'📈', cor:'#4ade80', tipo:'rec'},
+  {id:'c22',nome:'Pró-labore',             icone:'🏢', cor:'#34d399', tipo:'rec'},
+  {id:'c23',nome:'Vendas',                 icone:'🛍️', cor:'#fb923c', tipo:'rec'},
+  {id:'c24',nome:'Comissões Recebidas',    icone:'🤑', cor:'#a3e635', tipo:'rec'},
+  {id:'c25',nome:'Aluguel Recebido',       icone:'🏡', cor:'#60a5fa', tipo:'rec'},
+  {id:'c26',nome:'Reembolsos',             icone:'↩️', cor:'#94a3b8', tipo:'rec'},
+  {id:'c27',nome:'Transferências',         icone:'↔️', cor:'#64748b', tipo:'rec'},
+  {id:'c14',nome:'Outros ganhos',          icone:'🎊', cor:'#2dd4bf', tipo:'rec'},
 ];
 
 const EMOJIS = ['🍽️','🛒','🚗','💊','🏠','🎬','📚','👗','📱','💸','💰','💼','📈','🎁','✈️','🏥','⚽','🎮','🐶','👶','💅','🔧','🏋️','☕','🍺','🎵','🛍️','💻','📷','🎯'];
@@ -1195,6 +1210,16 @@ function initApp(){
   document.getElementById('fab').style.display='flex';
   currentMes = currentMes || mesAtual();
   if(!DB.lancamentos[currentMes]) DB.lancamentos[currentMes]=[];
+
+  // Merge: injeta categorias padrão novas sem remover customizadas do usuário
+  const idsExistentes = new Set(DB.categorias.map(c=>c.id));
+  CATS_DEFAULT.forEach(cat=>{
+    if(!idsExistentes.has(cat.id)) DB.categorias.push(cat);
+  });
+  // Garante ordem: padrão primeiro, customizadas depois
+  const customCats = DB.categorias.filter(c=>!CATS_DEFAULT.find(d=>d.id===c.id));
+  DB.categorias = [...CATS_DEFAULT.filter(c=>idsExistentes.has(c.id)||true), ...customCats].filter((c,i,arr)=>arr.findIndex(x=>x.id===c.id)===i);
+  dbSave();
 
   // Avatar
   const av = document.getElementById('user-avatar');
@@ -2878,6 +2903,12 @@ function autoCat(desc, tipo){
       [['SALARIO','SALÁRIO','FOLHA PAGAMENTO','HOLERITE'], 'Salário'],
       [['FREELANCE','PRESTACAO','PRESTAÇÃO','PJ ','SERVIÇO','SERVICO'], 'Freelance'],
       [['DIVIDENDO','RENDIMENTO','JUROS','RESGATE','CDB','LCI','LCA','TESOURO'], 'Investimentos'],
+      [['PRO LABORE','PRÓ-LABORE','PROLABORE'], 'Pró-labore'],
+      [['VENDA','PEDIDO','FATURAMENTO','RECEITA VENDA','NF ','NOTA FISCAL'], 'Vendas'],
+      [['COMISSAO RECEB','COMISSÃO RECEB','REPASSE COMISSAO','REPASSE COMISSÃO'], 'Comissões Recebidas'],
+      [['ALUGUEL RECEB','LOCACAO RECEB','LOCAÇÃO RECEB','RENDA ALUGUEL'], 'Aluguel Recebido'],
+      [['REEMBOLSO','ESTORNO','DEVOLUCAO','DEVOLUÇÃO','RESSARCIMENTO'], 'Reembolsos'],
+      [['TRANSF ENTRE','TRANSFERENCIA PROPRIA','TRANSFERÊNCIA PRÓPRIA','CONTA PROPRIA'], 'Transferências'],
     ];
     for(const [keys,nome] of mapRec){
       if(keys.some(k=>d.includes(k))){
@@ -2894,6 +2925,7 @@ function autoCat(desc, tipo){
     [['RESTAURANTE','SUSHI','PIZZA','HAMBUR','BURGER','LANCHE','BAR ','BOTECO','OUTBACK','ARTUSI','DEVITO','CHURRASCARIA','GASTRONOMIA','BISTRÔ','BISTRO','PADARIA','PANIFICADORA','PAOEPROSA','WORLD COOKIES','CAFE','COFFEE','SNACK'], 'Alimentação'],
     [['IFOOD','RAPPI','UBER EATS','DELIVERY'], 'Alimentação'],
     [['FARMACIA','DROGARIA','RAIA','PANVEL','ULTRAFARMA','LABORATORIO','CLINICA','HOSPITAL','MEDICO','MÉDICO','SAUDE','SAÚDE','EXAME','CONSULTA','PLANO DE SAUDE'], 'Saúde'],
+    [['ACADEMIA','GYM','CROSSFIT','SMARTFIT','BODYTECH','PERSONAL','PILATES','YOGA'], 'Saúde'],
     [['POSTO DE GASOLINA','COMBUSTIVEL','GASOLINA','ETANOL','DIESEL','POSTO ','SHELL','PETROBRAS','IPIRANGA','AUTO POSTO'], 'Transporte'],
     [['UBER ','CABIFY','99APP','TAXI','ÔNIBUS','ONIBUS','METRO','METRÔ','SPTrans'], 'Transporte'],
     [['LOCALIZA','MOVIDA','UNIDAS','ALUGUEL DE CARRO','RENT A CAR'], 'Transporte'],
@@ -2903,7 +2935,14 @@ function autoCat(desc, tipo){
     [['ZARA','RENNER','RIACHUELO','MARISA','HERING','SHEIN','SHOPEE','MERCADO LIVRE','MANTO SPORTS','DECATHLON','CENTAURO','CALCADO','SAPATARIA'], 'Roupas'],
     [['ESCOLA','FACULDADE','UNIVERSIDADE','CURSO','LIVRO','LIVRARIA','EDUCAÇÃO','EDUCACAO','IDIOMA','MENSALIDADE'], 'Educação'],
     [['CINEMA','TEATRO','SHOW','INGRESSO','VIAGEM','HOTEL','AIRBNB','POUSADA','RESORT','PARQUE','LAZER'], 'Lazer'],
-    [['ACADEMIA','GYM','CROSSFIT','SMARTFIT','BODYTECH','PERSONAL','PILATES','YOGA'], 'Saúde'],
+    // Novas categorias de despesa
+    [['IMPOSTO','TRIBUTO','RECEITA FEDERAL','SEFAZ','SIMPLES NACIONAL','DAS ','DARF','ISS','ICMS','INSS','FGTS','MUNICIPIO','PREFEITURA','TAXA ','GUIA '], 'Impostos e Taxas'],
+    [['CONTABILIDADE','CONTADOR','ASSESSORIA','CONSULTORIA','ADVOCACIA','JURIDICO','JURÍDICO','ADVOGADO','NOTARIO','CARTÓRIO','AUDITORIA'], 'Serviços'],
+    [['SALARIO FUNC','PAGAMENTO FUNC','COLABORADOR','COMISSAO','COMISSÃO','FOLHA','CLT','FUNCIONARIO','FUNCIONÁRIO','PRO LABORE','PRÓ-LABORE'], 'Colaboradores'],
+    [['FORNECEDOR','DISTRIBUIDORA','ATACADISTA','INSUMO','MATERIA PRIMA','ESTOQUE','COMPRA PROD'], 'Fornecedores'],
+    [['GITHUB','HEROKU','NETLIFY','AWS ','AZURE','GOOGLE CLOUD','DIGITALOCEAN','HOSTINGER','GODADDY','REGISTRO.BR','CLOUDFLARE','SOFTWARE','SISTEMA','LICENCA','LICENÇA','SAAS','NOTION','SLACK','FIGMA','CANVA','CHATGPT','OPENAI','HUBSPOT','RDSTATION','SALESFORCE','PIPEDRIVE'], 'Tecnologia'],
+    [['SALAO','SALÃO','BARBEARIA','CABELEIREIRO','ESTETICA','ESTÉTICA','MANICURE','DEPILACAO','DEPILAÇÃO','SPA ','PERFUMARIA','FARMACIA BELEZA','BEAUTY','DERMATO'], 'Beleza e Cuidados'],
+    [['PRESENTE','DOACAO','DOAÇÃO','BENEFICENTE','ONG ','SOLIDARIO','SOLIDÁRIO','LEMBRANCA','LEMBRANÇA','ANIVERSARIO'], 'Presentes e Doações'],
   ];
 
   for(const [keys,nome] of mapDesp){
