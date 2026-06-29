@@ -4180,7 +4180,7 @@ let _longPressTimer = null;
 function entrarModoSelecao(id){
   modoSelecao = true;
   lancsSelecionados = new Set([id]);
-  document.getElementById('lanc-list').querySelector('.card')?.classList.add('modo-selecao');
+  aplicarModoSelecaoDOM();
   atualizarBarraSelecao();
   atualizarChecks();
 }
@@ -4193,10 +4193,17 @@ function sairModoSelecao(){
   document.querySelectorAll('.lanc-item').forEach(el => el.classList.remove('selecionado'));
 }
 
+function aplicarModoSelecaoDOM(){
+  // Garante que a classe modo-selecao está no card mesmo após re-render
+  const card = document.getElementById('lanc-list').querySelector('.card');
+  if(card) card.classList.add('modo-selecao');
+}
+
 function toggleSelecao(id){
   if(lancsSelecionados.has(id)) lancsSelecionados.delete(id);
   else lancsSelecionados.add(id);
   if(lancsSelecionados.size === 0){ sairModoSelecao(); return; }
+  aplicarModoSelecaoDOM();
   atualizarBarraSelecao();
   atualizarChecks();
 }
@@ -4208,6 +4215,8 @@ function atualizarBarraSelecao(){
 }
 
 function atualizarChecks(){
+  // Reaplicar modo-selecao no card (pode ter sido re-renderizado)
+  aplicarModoSelecaoDOM();
   document.querySelectorAll('.lanc-item').forEach(el => {
     const id = el.dataset.id;
     el.classList.toggle('selecionado', lancsSelecionados.has(id));
@@ -4265,7 +4274,7 @@ lancHTML = function(l){
     ontouchstart="_lpStart('${l.id}',event)"
     ontouchend="_lpEnd()"
     ontouchcancel="_lpEnd()"
-    ontouchmove="_lpEnd()"
+    ontouchmove="_lpMove()"
     onmousedown="_lpStart('${l.id}',event)"
     onmouseup="_lpEnd()"
     onmouseleave="_lpEnd()"
@@ -4280,20 +4289,32 @@ lancHTML = function(l){
   </div>`;
 };
 
+let _lpMoved = false;
+let _lpActivated = false;
+
 function _lpStart(id, e){
   _lpEnd();
+  _lpMoved = false;
+  _lpActivated = false;
   _longPressTimer = setTimeout(()=>{
     _longPressTimer = null;
+    if(_lpMoved) return; // ignorar se houve scroll
+    _lpActivated = true;
     navigator.vibrate && navigator.vibrate(40);
     if(!modoSelecao) entrarModoSelecao(id);
     else toggleSelecao(id);
-  }, 500);
+  }, 550);
+}
+function _lpMove(){
+  // Só cancela se o movimento for significativo (scroll)
+  _lpMoved = true;
+  _lpEnd();
 }
 function _lpEnd(){
   if(_longPressTimer){ clearTimeout(_longPressTimer); _longPressTimer = null; }
 }
 function _lancClick(id, e){
-  if(_longPressTimer) return; // vai ser tratado pelo long press
+  if(_lpActivated){ _lpActivated = false; return; } // long press já tratou
   if(modoSelecao){ e.preventDefault(); e.stopPropagation(); toggleSelecao(id); return; }
   editLanc(id);
 }
