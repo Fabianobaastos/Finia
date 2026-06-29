@@ -4221,8 +4221,11 @@ function atualizarBarraLote(){
   const n = lancsSelecionados.size;
   const barra = document.getElementById('barra-selecao');
   const info  = document.getElementById('barra-selecao-info');
+  const fab   = document.getElementById('fab');
   if(info) info.textContent = `${n} selecionado${n!==1?'s':''}`;
   if(barra) barra.classList.toggle('ativa', n > 0);
+  // Esconder FAB para não sobrepor botões da barra
+  if(fab) fab.style.display = n > 0 ? 'none' : 'flex';
 }
 
 function sairModoSelecao(){
@@ -4233,6 +4236,9 @@ function sairModoSelecao(){
     if(box){ box.classList.remove('lanc-cb-on'); box.textContent=''; }
   });
   atualizarBarraLote();
+  // Restaurar FAB
+  const fab = document.getElementById('fab');
+  if(fab && currentTab==='lanc') fab.style.display = 'flex';
 }
 
 function deletarSelecionados(){
@@ -4241,24 +4247,34 @@ function deletarSelecionados(){
   const n = ids.length;
   const modal = document.createElement('div');
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  const idsJson = JSON.stringify(ids);
   modal.innerHTML=`
     <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center">
       <div style="font-size:32px;margin-bottom:12px">🗑</div>
       <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Apagar ${n} lançamento${n!==1?'s':''}?</div>
       <div style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6">Essa ação não pode ser desfeita.</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <button onclick="confirmarDeleteLote(${JSON.stringify(ids)});this.closest('[style*=fixed]').remove()"
-          style="padding:14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">
+        <button id="_btn-confirmar-delete"
+          style="padding:14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent">
           Sim, apagar${n>1?' todos':''}
         </button>
-        <button onclick="this.closest('[style*=fixed]').remove()"
-          style="padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+        <button id="_btn-cancelar-delete"
+          style="padding:12px;border-radius:12px;border:1.5px solid #334155;background:#1e293b;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent">
           Cancelar
         </button>
       </div>
     </div>`;
   modal.onclick=(e)=>{if(e.target===modal)modal.remove();};
   document.body.appendChild(modal);
+  // Usar addEventListener para garantir funcionamento no iOS
+  const _addTouch = (id, fn) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('touchend', (e)=>{ e.preventDefault(); fn(); }, {passive:false});
+    el.addEventListener('click', fn);
+  };
+  _addTouch('_btn-confirmar-delete', ()=>{ confirmarDeleteLote(ids); modal.remove(); });
+  _addTouch('_btn-cancelar-delete', ()=>{ modal.remove(); });
 }
 
 function confirmarDeleteLote(ids){
@@ -4282,21 +4298,33 @@ function moverCategoriaSelecionados(){
     <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:24px;max-width:340px;width:100%">
       <div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:16px">📂 Mover ${ids.length} lançamento${ids.length!==1?'s':''} para...</div>
       <div style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto">
-        ${cats.map(c=>`
-          <button onclick="confirmarMoverLote(${JSON.stringify(ids)},'${c.id}');this.closest('[style*=fixed]').remove()"
-            style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#f1f5f9;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left">
+        ${cats.map((c,i)=>`
+          <button data-catid="${c.id}" data-idx="${i}"
+            style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;border:1.5px solid #334155;background:#1e293b;color:#f1f5f9;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent">
             <span style="font-size:20px">${c.icone}</span>
             <span>${c.nome}</span>
             <span style="margin-left:auto;font-size:10px;color:#64748b;background:${c.cor}22;padding:2px 8px;border-radius:6px">${c.tipo==='rec'?'receita':'despesa'}</span>
           </button>`).join('')}
       </div>
-      <button onclick="this.closest('[style*=fixed]').remove()"
-        style="margin-top:14px;width:100%;padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+      <button id="_btn-cancelar-mover"
+        style="margin-top:14px;width:100%;padding:12px;border-radius:12px;border:1.5px solid #334155;background:#1e293b;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent">
         Cancelar
       </button>
     </div>`;
   modal.onclick=(e)=>{if(e.target===modal)modal.remove();};
   document.body.appendChild(modal);
+  // Listeners para cada categoria via addEventListener (funciona no iOS)
+  modal.querySelectorAll('[data-catid]').forEach(btn => {
+    const catId = btn.dataset.catid;
+    const handler = (e) => { e.preventDefault(); confirmarMoverLote(ids, catId); modal.remove(); };
+    btn.addEventListener('touchend', handler, {passive:false});
+    btn.addEventListener('click', handler);
+  });
+  const cancelBtn = document.getElementById('_btn-cancelar-mover');
+  if(cancelBtn){
+    cancelBtn.addEventListener('touchend', (e)=>{ e.preventDefault(); modal.remove(); }, {passive:false});
+    cancelBtn.addEventListener('click', ()=> modal.remove());
+  }
 }
 
 function confirmarMoverLote(ids, catId){
