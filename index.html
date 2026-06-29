@@ -2794,10 +2794,9 @@ function parsearFatura(txt){
 
 // ── RECATEGORIZAÇÃO POR IA (lote, pós-import) ────────────────────────────────
 async function recategorizarComIA(items){
-  // Só para usuários Pro com IA disponível
   if(!isPro()) return;
 
-  // Badge de progresso — aparece no cabeçalho do step2
+  // Badge de progresso
   const sub = document.getElementById('iResSub');
   let badge = document.getElementById('_ia-cat-badge');
   if(!badge && sub){
@@ -2809,7 +2808,7 @@ async function recategorizarComIA(items){
   }
 
   try {
-    const cats = DB.categorias.map(c => c.nome).join(', ');
+    const cats = DB.categorias.map(c => `${c.nome} (${c.tipo==='rec'?'receita':'despesa'})`).join(', ');
 
     // Histórico de categorizações do usuário para aprendizado contextual
     const exemplos = Object.values(DB.lancamentos).flat()
@@ -2820,63 +2819,74 @@ async function recategorizarComIA(items){
         return `"${l.desc}" → ${cat?.nome || 'Outros'}`;
       }).join('\n');
 
-    // Montar lista compacta de lançamentos para a IA
-    const lista = items.map((it, i) =>
-      `${i}|${it.tipo === 'rec' ? 'ENTRADA' : 'SAIDA'}|${it.desc}`
-    ).join('\n');
+    const sistemPrompt = 'Você categoriza lançamentos financeiros brasileiros de pessoas físicas e empresas. Retorne apenas JSON válido, sem markdown.';
 
-    const prompt = `Você categoriza lançamentos financeiros brasileiros — tanto de pessoas físicas quanto de empresas (MEIs, PMEs).
+    const buildPrompt = (lote) => `Categorize os lançamentos abaixo nas categorias disponíveis.
 
 CATEGORIAS DISPONÍVEIS: ${cats}
 
-HISTÓRICO DE CATEGORIZAÇÕES DO USUÁRIO (aprenda o padrão):
+HISTÓRICO DO USUÁRIO (aprenda o padrão):
 ${exemplos || '(nenhum ainda)'}
 
-LANÇAMENTOS (formato: índice|tipo|descrição):
-${lista}
+LANÇAMENTOS (formato: índice|ENTRADA ou SAIDA|descrição):
+${lote}
 
 REGRAS:
-- Retorne APENAS JSON válido: {"cats": {"0": "NomeCategoria", "1": "NomeCategoria", ...}}
-- Use EXATAMENTE o nome da categoria como fornecido acima
-- Para SAIDA de pessoa física: Mercado, Alimentação, Transporte, Moradia, Saúde, Assinaturas, Roupas, Educação, Lazer ou Outros gastos
-- Para SAIDA empresarial (ex: pagamento a colaborador, prestador, contabilidade, fornecedor, plataforma): use "Outros gastos" se não houver categoria específica — mas tente inferir pelo nome (CONTABILIDADE → Serviços, UBER → Transporte, etc.)
-- Para ENTRADA: Salário, Freelance, Investimentos ou Outros ganhos
-- PIX para pessoa física com nome completo e sem contexto adicional: "Outros gastos"
-- Nomes de contabilidade/assessoria: "Outros gastos" (ou categoria mais próxima disponível)
+- Retorne APENAS JSON: {"cats": {"0": "NomeCategoria", "1": "NomeCategoria", ...}}
+- Use EXATAMENTE o nome da categoria como listado acima
+- PIX para pessoa física sem contexto claro → "Outros gastos"
+- Contabilidade, assessoria, jurídico → "Serviços"
+- Pagamento a colaborador, comissão paga → "Colaboradores"
+- Compra de insumo, material, produto → "Fornecedores"
+- Software, plataforma, SaaS, hosting → "Tecnologia"
+- Imposto, guia, tributo, DAS, DARF → "Impostos e Taxas"
+- Pró-labore recebido → "Pró-labore"
+- Venda de produto/serviço → "Vendas"
+- Estorno, reembolso, devolução → "Reembolsos"
 - Nunca invente categorias fora da lista`;
 
-    const resposta = await chamarIA(
-      prompt,
-      'Você categoriza lançamentos financeiros. Retorne apenas JSON válido, sem markdown.',
-      800
-    );
-
-    const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    let resultado;
-    try { resultado = JSON.parse(json); }
-    catch {
-      const m = json.match(/\{[\s\S]*\}/);
-      if(m) resultado = JSON.parse(m[0]);
-      else throw new Error('JSON inválido');
-    }
-
-    const cats_map = resultado.cats || {};
+    // Processar em lotes de 50 para evitar estouro de tokens
+    const LOTE = 50;
     let alterados = 0;
 
-    Object.entries(cats_map).forEach(([idxStr, nomeCategoria]) => {
-      const idx = parseInt(idxStr);
-      if(isNaN(idx) || !items[idx]) return;
-      const cat = DB.categorias.find(c =>
-        c.nome.toLowerCase() === nomeCategoria.toLowerCase()
-      );
-      if(cat && cat.id !== items[idx].catId){
-        items[idx].catId = cat.id;
-        alterados++;
-      }
-    });
+    for(let inicio = 0; inicio < items.length; inicio += LOTE){
+      const fatia = items.slice(inicio, inicio + LOTE);
+      const lista = fatia.map((it, i) =>
+        `${inicio + i}|${it.tipo === 'rec' ? 'ENTRADA' : 'SAIDA'}|${it.desc}`
+      ).join('\n');
 
-    // Atualizar a UI com as novas categorias
-    if(alterados > 0) renderImpResult();
+      const resposta = await chamarIA(buildPrompt(lista), sistemPrompt, 2000);
+
+      const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      let resultado;
+      try { resultado = JSON.parse(json); }
+      catch {
+        const m = json.match(/\{[\s\S]*\}/);
+        if(m) resultado = JSON.parse(m[0]);
+        else continue; // pular lote com erro, não abortar tudo
+      }
+
+      const cats_map = resultado.cats || {};
+      Object.entries(cats_map).forEach(([idxStr, nomeCategoria]) => {
+        const idx = parseInt(idxStr);
+        if(isNaN(idx) || !items[idx]) return;
+        const cat = DB.categorias.find(c =>
+          c.nome.toLowerCase() === nomeCategoria.toLowerCase()
+        );
+        if(cat && cat.id !== items[idx].catId){
+          items[idx].catId = cat.id;
+          alterados++;
+        }
+      });
+
+      // Atualizar UI progressivamente a cada lote
+      if(alterados > 0) renderImpResult();
+
+      if(badge){
+        const total = Math.min(inicio + LOTE, items.length);
+        badge.textContent = `✨ Categorizando... ${total}/${items.length}`;
+      }
+    }
 
     if(badge){
       badge.style.background = 'rgba(34,211,165,.12)';
@@ -2885,7 +2895,7 @@ REGRAS:
     }
 
   } catch(err) {
-    console.warn('Recategorização IA falhou (usando autoCat):', err.message);
+    console.warn('Recategorização IA falhou:', err.message);
     if(badge){
       badge.style.background = 'rgba(251,191,36,.1)';
       badge.style.color = '#fbbf24';
