@@ -1,0 +1,3895 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finia">
+<!-- PWA Manifest inline via script (compatível com file:// e https://) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finia">
+<meta name="application-name" content="Finia">
+<title>Finia — Seu dinheiro, no controle</title>
+<!-- Fontes: carrega async para não bloquear. App funciona com system fonts se offline -->
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap"></noscript>
+<style>
+/* ── TOKENS ─────────────────────────────────────────────────────────────── */
+:root{
+  --bg:   #0f172a;
+  --s1:   #1e293b;
+  --s2:   #253347;
+  --bd:   #334155;
+  --mu:   #64748b;
+  --tx:   #f1f5f9;
+  --ts:   #cbd5e1;
+  --gr:   #22d3a5;
+  --gr2:  #16a37e;
+  --rd:   #f87171;
+  --am:   #fbbf24;
+  --bl:   #6366f1;
+  --bl2:  #4f46e5;
+  --pu:   #a78bfa;
+  --card-r: 16px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:14px}
+.mono{font-family:'DM Mono',monospace}
+
+/* ── TELAS ──────────────────────────────────────────────────────────────── */
+.screen{position:fixed;inset:0;overflow-y:auto;overflow-x:hidden;display:none;flex-direction:column;background:var(--bg)}
+.screen.active{display:flex}
+
+/* ── ONBOARDING ─────────────────────────────────────────────────────────── */
+#s-onboard{background:linear-gradient(160deg,#0f172a 0%,#1a1040 100%);align-items:center;justify-content:center;padding:32px 24px}
+.ob-logo{font-size:38px;font-weight:800;letter-spacing:-1.5px;color:#fff;margin-bottom:6px}
+.ob-logo span{color:var(--gr)}
+.ob-tagline{font-size:13px;color:var(--mu);margin-bottom:44px;text-align:center}
+.ob-card{background:var(--s1);border:1px solid var(--bd);border-radius:24px;padding:28px 24px;width:100%;max-width:420px}
+.ob-step{display:none}.ob-step.active{display:block}
+.ob-title{font-size:19px;font-weight:700;margin-bottom:6px}
+.ob-sub{font-size:12px;color:var(--mu);margin-bottom:22px;line-height:1.6}
+.inp{width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:13px 14px;color:var(--tx);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;outline:none;transition:border-color .15s}
+.inp:focus{border-color:var(--bl)}
+.inp::placeholder{color:var(--mu)}
+.inp-wrap{margin-bottom:14px}
+.inp-label{font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.chip-group{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.chip{padding:8px 14px;border-radius:20px;border:1.5px solid var(--bd);background:var(--s2);color:var(--ts);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.chip.sel{border-color:var(--gr);background:rgba(34,211,165,.12);color:var(--gr)}
+.btn-main{width:100%;padding:15px;border-radius:14px;border:none;background:var(--gr);color:#0f172a;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;transition:all .15s}
+.btn-main:active{transform:scale(.97)}
+.btn-ghost{width:100%;padding:12px;border-radius:14px;border:1.5px solid var(--bd);background:transparent;color:var(--mu);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px}
+.ob-dots{display:flex;gap:6px;justify-content:center;margin-top:20px}
+.ob-dot{width:6px;height:6px;border-radius:3px;background:var(--bd);transition:all .3s}
+.ob-dot.active{width:18px;background:var(--gr)}
+
+/* ── APP SHELL ──────────────────────────────────────────────────────────── */
+#s-app{padding-bottom:calc(68px + var(--safe-b))}
+.topbar{position:sticky;top:0;z-index:50;background:rgba(15,23,42,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:14px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(51,65,85,.5)}
+.topbar-title{font-size:15px;font-weight:700}
+.topbar-sub{font-size:11px;color:var(--mu);margin-top:1px}
+.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--bl),var(--pu));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;cursor:pointer;flex-shrink:0}
+
+/* ── BOTTOM NAV ─────────────────────────────────────────────────────────── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(15,23,42,.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid rgba(51,65,85,.6);display:flex;padding-bottom:var(--safe-b)}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 8px;cursor:pointer;gap:4px;transition:all .15s;position:relative}
+.bnav-icon{font-size:20px;transition:transform .2s}
+.bnav-label{font-size:9px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;transition:color .15s}
+.bnav-item.active .bnav-label{color:var(--gr)}
+.bnav-item.active .bnav-icon{transform:scale(1.15)}
+.bnav-item.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;background:var(--gr);border-radius:0 0 2px 2px}
+.fab{position:fixed;bottom:calc(78px + var(--safe-b));right:18px;z-index:200;width:54px;height:54px;border-radius:50%;background:var(--gr);border:none;color:#0f172a;font-size:26px;font-weight:300;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(34,211,165,.4);transition:all .2s}
+.fab:active{transform:scale(.93)}
+
+/* ── TABS (inner) ───────────────────────────────────────────────────────── */
+.tab-content{display:none}.tab-content.active{display:block}
+.page{padding:16px}
+
+/* ── CARDS ──────────────────────────────────────────────────────────────── */
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:var(--card-r);padding:18px;margin-bottom:12px}
+.card-sm{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px}
+.section-title{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+
+/* ── SALDO HERO ─────────────────────────────────────────────────────────── */
+.hero-card{background:linear-gradient(135deg,#1a2744 0%,#1e1040 100%);border:1px solid rgba(99,102,241,.25);border-radius:22px;padding:24px 20px 20px;margin-bottom:12px;position:relative;overflow:hidden}
+.hero-card::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.15) 0%,transparent 70%)}
+.hero-label{font-size:11px;font-weight:600;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.hero-value{font-size:36px;font-weight:800;font-family:'DM Mono',monospace;letter-spacing:-1px;margin-bottom:14px}
+.hero-value.pos{color:var(--gr)}
+.hero-value.neg{color:var(--rd)}
+.hero-row{display:flex;gap:12px}
+.hero-stat{flex:1;background:rgba(255,255,255,.05);border-radius:12px;padding:10px 12px}
+.hero-stat-l{font-size:10px;color:rgba(255,255,255,.45);font-weight:600;margin-bottom:4px}
+.hero-stat-v{font-size:15px;font-weight:700;font-family:'DM Mono',monospace}
+
+/* ── KPIS GRID ──────────────────────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.kpi{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px}
+.kpi-icon{font-size:20px;margin-bottom:8px}
+.kpi-label{font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.kpi-value{font-size:17px;font-weight:700;font-family:'DM Mono',monospace}
+
+/* ── LISTA LANÇAMENTOS ──────────────────────────────────────────────────── */
+.lanc-group-title{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.07em;padding:6px 0 8px}
+.lanc-item{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid rgba(51,65,85,.4);cursor:pointer;transition:opacity .15s}
+.lanc-item:last-child{border-bottom:none}
+.lanc-item:active{opacity:.7}
+.lanc-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.lanc-info{flex:1;min-width:0}
+.lanc-desc{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lanc-cat{font-size:11px;color:var(--mu);margin-top:2px}
+.lanc-val{font-size:14px;font-weight:700;font-family:'DM Mono',monospace;white-space:nowrap}
+.lanc-val.rec{color:var(--gr)}
+.lanc-val.desp{color:var(--rd)}
+
+/* ── GRÁFICO DE BARRAS ──────────────────────────────────────────────────── */
+.bar-chart{display:flex;flex-direction:column;gap:10px}
+.bar-item{}
+.bar-header{display:flex;justify-content:space-between;margin-bottom:5px}
+.bar-label{font-size:12px;font-weight:600}
+.bar-val{font-size:12px;font-family:'DM Mono',monospace;color:var(--mu)}
+.bar-track{height:6px;background:var(--s2);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.34,1.56,.64,1)}
+
+/* ── PIZZA ──────────────────────────────────────────────────────────────── */
+.donut-wrap{display:flex;align-items:center;gap:20px}
+.donut-legend{flex:1;display:flex;flex-direction:column;gap:7px}
+.donut-leg-item{display:flex;align-items:center;gap:8px}
+.donut-leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.donut-leg-label{font-size:11px;flex:1}
+.donut-leg-pct{font-size:11px;font-family:'DM Mono',monospace;color:var(--mu)}
+
+/* ── PARCELAMENTOS ──────────────────────────────────────────────────────── */
+.parc-item{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:10px}
+.parc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.parc-name{font-size:13px;font-weight:700}
+.parc-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(251,191,36,.12);color:var(--am)}
+.parc-progress{height:5px;background:var(--s2);border-radius:3px;overflow:hidden;margin-bottom:8px}
+.parc-progress-fill{height:100%;border-radius:3px;background:var(--am);transition:width .5s}
+.parc-footer{display:flex;justify-content:space-between}
+.parc-info{font-size:10px;color:var(--mu)}
+.parc-info strong{color:var(--ts)}
+
+/* ── IMPORTADOR ─────────────────────────────────────────────────────────── */
+.imp-type-row{display:flex;gap:8px;margin-bottom:16px}
+.imp-type-btn{flex:1;padding:12px;border-radius:12px;border:1.5px solid var(--bd);background:var(--s2);color:var(--mu);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-align:center;transition:all .15s}
+.imp-type-btn.active{border-color:var(--bl);background:rgba(99,102,241,.1);color:var(--bl)}
+.drop-zone{border:2px dashed var(--bd);border-radius:16px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--s2);margin-bottom:12px}
+.drop-zone.drag{border-color:var(--bl);background:rgba(99,102,241,.08)}
+.drop-zone-icon{font-size:32px;margin-bottom:8px}
+.drop-zone-title{font-size:13px;font-weight:700;margin-bottom:4px}
+.drop-zone-sub{font-size:11px;color:var(--mu)}
+.imp-textarea{width:100%;min-height:120px;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px;color:var(--tx);font-family:'DM Mono',monospace;font-size:11px;resize:vertical;outline:none;line-height:1.6;transition:border-color .15s}
+.imp-textarea:focus{border-color:var(--bl)}
+.imp-result-item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(51,65,85,.3)}
+.imp-result-item:last-child{border-bottom:none}
+.imp-chk{width:18px;height:18px;flex-shrink:0;cursor:pointer;accent-color:var(--gr)}
+
+/* ── RELATÓRIOS ─────────────────────────────────────────────────────────── */
+.period-tabs{display:flex;background:var(--s2);border-radius:12px;padding:3px;gap:3px;margin-bottom:16px}
+.period-tab{flex:1;padding:8px;border-radius:9px;border:none;background:transparent;color:var(--mu);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.period-tab.active{background:var(--s1);color:var(--tx);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.insight-card{background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(167,139,250,.06));border:1px solid rgba(99,102,241,.2);border-radius:16px;padding:16px;margin-bottom:10px}
+.insight-icon{font-size:20px;margin-bottom:8px}
+.insight-title{font-size:13px;font-weight:700;margin-bottom:4px}
+.insight-text{font-size:12px;color:var(--ts);line-height:1.6}
+.insight-text strong{color:var(--gr)}
+
+/* ── CATEGORIAS ─────────────────────────────────────────────────────────── */
+.cat-item{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid rgba(51,65,85,.4)}
+.cat-item:last-child{border-bottom:none}
+.cat-ico-wrap{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.cat-name{font-size:13px;font-weight:600;flex:1}
+.cat-type{font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px}
+.cat-type.desp{background:rgba(248,113,113,.12);color:var(--rd)}
+.cat-type.rec{background:rgba(34,211,165,.12);color:var(--gr)}
+.cat-type.both{background:rgba(99,102,241,.12);color:var(--bl)}
+.cat-edit{padding:6px 10px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--mu);font-size:11px;font-weight:600;cursor:pointer}
+
+/* ── CONFIGURAÇÕES ──────────────────────────────────────────────────────── */
+.cfg-section{margin-bottom:20px}
+.cfg-item{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(51,65,85,.4)}
+.cfg-item:last-child{border-bottom:none}
+.cfg-label{font-size:13px;font-weight:600}
+.cfg-sub{font-size:11px;color:var(--mu);margin-top:2px}
+.toggle{width:44px;height:24px;border-radius:12px;background:var(--bd);position:relative;cursor:pointer;transition:background .2s;border:none;flex-shrink:0}
+.toggle.on{background:var(--gr)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:9px;background:#fff;transition:transform .2s}
+.toggle.on::after{transform:translateX(20px)}
+.cfg-arrow{color:var(--mu);font-size:14px}
+
+/* ── MODAL / DRAWER ─────────────────────────────────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:none;backdrop-filter:blur(4px)}
+.overlay.open{display:block}
+.drawer{position:fixed;bottom:0;left:0;right:0;z-index:400;background:var(--s1);border-radius:24px 24px 0 0;padding:0 0 calc(24px + var(--safe-b));max-height:92vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}
+.drawer.open{transform:translateY(0)}
+.drawer-handle{width:36px;height:4px;border-radius:2px;background:var(--bd);margin:12px auto 18px;flex-shrink:0}
+.drawer-title{font-size:16px;font-weight:700;padding:0 20px;margin-bottom:20px}
+.drawer-body{padding:0 20px}
+.drawer-btns{padding:16px 20px 0;display:flex;gap:10px}
+
+/* ── FORM ELEMENTS ──────────────────────────────────────────────────────── */
+.form-group{margin-bottom:16px}
+.form-label{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;display:block}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.emoji-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+.emoji-opt{width:100%;aspect-ratio:1;border-radius:10px;border:1.5px solid var(--bd);background:var(--s2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.emoji-opt.sel{border-color:var(--bl);background:rgba(99,102,241,.15)}
+.color-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.color-opt{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s;flex-shrink:0}
+.color-opt.sel{border-color:#fff;transform:scale(1.2)}
+
+/* ── TOAST ──────────────────────────────────────────────────────────────── */
+.toast{position:fixed;bottom:calc(80px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(20px);background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:12px 18px;font-size:13px;font-weight:600;z-index:500;opacity:0;transition:all .3s;white-space:nowrap;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── ESTADOS VAZIOS ─────────────────────────────────────────────────────── */
+.empty{text-align:center;padding:48px 24px}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:.4}
+.empty-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--mu);line-height:1.6}
+
+/* ── BADGES / PILLS ─────────────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.badge-g{background:rgba(34,211,165,.12);color:var(--gr)}
+.badge-r{background:rgba(248,113,113,.12);color:var(--rd)}
+.badge-a{background:rgba(251,191,36,.12);color:var(--am)}
+.badge-b{background:rgba(99,102,241,.12);color:var(--bl)}
+
+/* ── SCROLL PERSONALIZADO ───────────────────────────────────────────────── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+
+/* ── MÊS SELECTOR ───────────────────────────────────────────────────────── */
+.month-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(30,41,59,.6)}
+.month-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--bd);background:var(--s2);color:var(--tx);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.month-btn:active{transform:scale(.9)}
+.month-label{font-size:15px;font-weight:700}
+
+/* ── ANÁLISE DÍVIDAS ────────────────────────────────────────────────────── */
+.divida-alert{background:linear-gradient(135deg,rgba(248,113,113,.08),rgba(251,191,36,.05));border:1px solid rgba(248,113,113,.2);border-radius:16px;padding:16px;margin-bottom:10px}
+.divida-total{font-size:24px;font-weight:800;font-family:'DM Mono',monospace;color:var(--rd);margin:6px 0}
+
+/* ── ANIMAÇÕES ──────────────────────────────────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fade-up{animation:fadeUp .3s ease both}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.loading{animation:pulse 1.2s infinite}
+
+/* ── RESPONSIVO DESKTOP ─────────────────────────────────────────────────── */
+@media(min-width:480px){
+  .screen{max-width:430px;left:50%;right:auto;transform:translateX(-50%);box-shadow:0 0 80px rgba(0,0,0,.5)}
+  .bottom-nav{max-width:430px;left:50%;transform:translateX(-50%)}
+  .fab{right:calc(50% - 215px + 18px)}
+  .overlay{max-width:100%}
+  .drawer{max-width:430px;left:50%;transform:translateX(-50%) translateY(100%)}
+  .drawer.open{transform:translateX(-50%) translateY(0)}
+  .toast{bottom:calc(80px + var(--safe-b))}
+}
+
+/* ── IMPORTADOR CARDS ───────────────────────────────────────────────────── */
+.imp-type-card{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:14px;border:1.5px solid var(--bd);background:var(--s2);cursor:pointer;text-align:left;width:100%;transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif}
+.imp-type-card.active{border-color:var(--gr);background:rgba(34,211,165,.08)}
+.imp-type-card:active{transform:scale(.98)}
+.imp-type-card-icon{font-size:28px;flex-shrink:0}
+.imp-type-card-body{flex:1}
+.imp-type-card-title{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:2px}
+.imp-type-card-sub{font-size:11px;color:var(--mu)}
+.imp-type-card-check{font-size:16px;font-weight:700;color:var(--gr);flex-shrink:0;transition:opacity .2s}
+
+/* ── ITEM RESULTADO IMPORTAÇÃO ──────────────────────────────────────────── */
+.imp-res-item{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid rgba(51,65,85,.35)}
+.imp-res-item:last-child{border-bottom:none}
+.imp-res-item.unchecked{opacity:.4}
+.imp-res-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;margin-top:2px}
+.imp-res-body{flex:1;min-width:0}
+.imp-res-desc{font-size:12px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.imp-res-val{font-size:13px;font-weight:700;font-family:'DM Mono',monospace;white-space:nowrap;flex-shrink:0;padding-top:2px}
+.cat-select-inline{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:7px;color:var(--ts);font-size:11px;padding:4px 8px;font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;outline:none}
+
+/* ── GUIA DE INSTALAÇÃO ─────────────────────────────────────────────────── */
+.install-btn{width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(135deg,#22d3a5,#16a37e);color:#0f172a;font-size:15px;font-weight:700;font-family:'Plus Jakarta Sans',-apple-system,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .15s}
+.install-btn:active{transform:scale(.97)}
+.install-step{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid rgba(51,65,85,.35)}
+.install-step:last-child{border-bottom:none}
+.install-step-num{width:28px;height:28px;border-radius:50%;background:var(--gr);color:#0f172a;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.install-step-body{flex:1}
+.install-step-title{font-size:13px;font-weight:700;margin-bottom:3px}
+.install-step-sub{font-size:11px;color:var(--mu);line-height:1.6}
+.install-step-img{font-size:22px;margin-top:4px}
+.installed-badge{display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(34,211,165,.08);border:1px solid rgba(34,211,165,.2);border-radius:12px}
+
+/* ── IA ─────────────────────────────────────────────────────────────────── */
+.ai-chat-btn{position:fixed;bottom:calc(82px + var(--safe-b));left:18px;z-index:200;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a78bfa);border:none;color:#fff;font-size:22px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(99,102,241,.5);transition:all .2s}
+.ai-chat-btn:active{transform:scale(.92)}
+.ai-chat-screen{position:fixed;inset:0;z-index:600;background:var(--bg);display:none;flex-direction:column}
+.ai-chat-screen.open{display:flex}
+.ai-chat-header{background:rgba(15,23,42,.95);backdrop-filter:blur(12px);padding:14px 18px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(51,65,85,.5)}
+.ai-chat-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ai-chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.ai-msg{max-width:85%;padding:12px 14px;border-radius:16px;font-size:13px;line-height:1.6;animation:fadeUp .2s ease}
+.ai-msg.user{align-self:flex-end;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border-bottom-right-radius:4px}
+.ai-msg.ai{align-self:flex-start;background:var(--s1);border:1px solid var(--bd);color:var(--tx);border-bottom-left-radius:4px}
+.ai-msg.ai.loading{color:var(--mu);animation:pulse 1.2s infinite}
+.ai-chat-input-wrap{padding:12px 16px calc(12px + var(--safe-b));background:rgba(15,23,42,.95);border-top:1px solid rgba(51,65,85,.4);display:flex;gap:8px;align-items:flex-end}
+.ai-chat-input{flex:1;background:var(--s2);border:1.5px solid var(--bd);border-radius:14px;padding:10px 14px;color:var(--tx);font-family:inherit;font-size:14px;resize:none;outline:none;max-height:100px;line-height:1.5;transition:border-color .15s}
+.ai-chat-input:focus{border-color:var(--bl)}
+.ai-send-btn{width:40px;height:40px;border-radius:50%;background:var(--bl);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.ai-send-btn:active{transform:scale(.9)}
+.ai-send-btn:disabled{background:var(--bd);cursor:not-allowed}
+.insight-ai-card{background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(167,139,250,.06));border:1px solid rgba(99,102,241,.25);border-radius:16px;padding:14px;margin-bottom:12px;position:relative;overflow:hidden}
+.insight-ai-card::before{content:'✨';position:absolute;top:12px;right:14px;font-size:14px;opacity:.6}
+.insight-ai-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(99,102,241,.15);color:#a78bfa;font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.insight-ai-text{font-size:12px;color:var(--ts);line-height:1.65}
+.insight-ai-text strong{color:#c4b5fd}
+.cat-suggest{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:10px;margin-bottom:12px;cursor:pointer;transition:all .15s}
+.cat-suggest:active{opacity:.7}
+.cat-suggest-label{font-size:11px;color:#a78bfa;font-weight:700;margin-bottom:2px}
+.cat-suggest-name{font-size:13px;font-weight:600;color:var(--tx)}
+@media(min-width:480px){
+  .ai-chat-btn{left:calc(50% - 215px + 18px)}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- TELA: ONBOARDING                                                       -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="screen" id="s-onboard">
+  <div class="ob-logo">fin<span>ia</span></div>
+  <div class="ob-tagline">Seu dinheiro, finalmente no controle.</div>
+
+  <div class="ob-card">
+    <!-- Passo 1: Quem é você -->
+    <div class="ob-step active" id="ob1">
+      <div class="ob-title">Olá! Como se chama?</div>
+      <div class="ob-sub">Vamos personalizar o Finia pra você.</div>
+      <div class="inp-wrap">
+        <div class="inp-label">Seu nome</div>
+        <input class="inp" id="ob-nome" type="text" placeholder="Ex: Ana Lima" autocomplete="off">
+      </div>
+      <div class="inp-wrap">
+        <div class="inp-label">Como vai usar o Finia?</div>
+        <div class="chip-group" id="ob-perfil-chips">
+          <div class="chip sel" data-v="pessoal">👤 Pessoal</div>
+          <div class="chip" data-v="mei">🏪 MEI/Autônomo</div>
+          <div class="chip" data-v="empresa">🏢 Empresa</div>
+        </div>
+      </div>
+      <button class="btn-main" onclick="obNext(2)">Continuar →</button>
+    </div>
+
+    <!-- Passo 2: Moeda e renda estimada -->
+    <div class="ob-step" id="ob2">
+      <div class="ob-title">Sua situação financeira</div>
+      <div class="ob-sub">Não precisa ser exato. Isso ajuda o Finia a calibrar seus relatórios.</div>
+      <div class="inp-wrap">
+        <div class="inp-label">Renda mensal aproximada</div>
+        <select class="inp" id="ob-renda">
+          <option value="ate2">Até R$ 2.000</option>
+          <option value="2a5" selected>R$ 2.000 – R$ 5.000</option>
+          <option value="5a10">R$ 5.000 – R$ 10.000</option>
+          <option value="acima10">Acima de R$ 10.000</option>
+        </select>
+      </div>
+      <div class="inp-wrap">
+        <div class="inp-label">Principais bancos que usa</div>
+        <div class="chip-group" id="ob-banco-chips">
+          <div class="chip" data-v="itau">Itaú</div>
+          <div class="chip" data-v="nubank">Nubank</div>
+          <div class="chip" data-v="bradesco">Bradesco</div>
+          <div class="chip" data-v="bb">Banco do Brasil</div>
+          <div class="chip" data-v="inter">Inter</div>
+          <div class="chip" data-v="caixa">Caixa</div>
+          <div class="chip" data-v="c6">C6</div>
+        </div>
+      </div>
+      <button class="btn-main" onclick="obNext(3)">Continuar →</button>
+      <button class="btn-ghost" onclick="obNext(1)">← Voltar</button>
+    </div>
+
+    <!-- Passo 3: Categorias iniciais -->
+    <div class="ob-step" id="ob3">
+      <div class="ob-title">Suas categorias</div>
+      <div class="ob-sub">Selecionamos as mais comuns. Você pode adicionar ou remover depois.</div>
+      <div class="chip-group" id="ob-cats-chips" style="max-height:160px;overflow-y:auto"></div>
+      <button class="btn-main" onclick="obFinalizar()">Começar agora ✓</button>
+      <button class="btn-ghost" onclick="obNext(2)">← Voltar</button>
+    </div>
+  </div>
+  <div class="ob-dots">
+    <div class="ob-dot active" id="od1"></div>
+    <div class="ob-dot" id="od2"></div>
+    <div class="ob-dot" id="od3"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- TELA: APP PRINCIPAL                                                    -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="screen" id="s-app">
+
+  <!-- Topbar dinâmica -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="topbar-title">Início</div>
+      <div class="topbar-sub" id="topbar-sub"></div>
+    </div>
+    <div class="avatar" id="user-avatar" onclick="navTo('cfg')">?</div>
+  </div>
+
+  <!-- Navegador de mês (visível em início e lançamentos) -->
+  <div class="month-nav" id="month-nav">
+    <button class="month-btn" onclick="mesAnterior()">‹</button>
+    <div class="month-label" id="month-label">—</div>
+    <button class="month-btn" onclick="mesSeguinte()">›</button>
+  </div>
+
+  <!-- ── TAB: INÍCIO ─────────────────────────────────────────────────── -->
+  <div class="tab-content active page" id="tab-inicio">
+    <div id="hero-wrap"></div>
+    <div id="insight-ai-wrap"></div>
+    <div id="kpis-wrap"></div>
+
+    <div class="section-title">Últimos lançamentos</div>
+    <div class="card" id="ultimos-wrap" style="padding:4px 16px"></div>
+
+    <div class="section-title" style="margin-top:4px">Gastos por categoria</div>
+    <div class="card" id="cats-wrap"></div>
+  </div>
+
+  <!-- ── TAB: LANÇAMENTOS ───────────────────────────────────────────── -->
+  <div class="tab-content page" id="tab-lanc">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="imp-type-btn active" id="filt-todos" onclick="filtLanc('todos',this)">Todos</button>
+      <button class="imp-type-btn" id="filt-rec" onclick="filtLanc('rec',this)">Entradas</button>
+      <button class="imp-type-btn" id="filt-desp" onclick="filtLanc('desp',this)">Saídas</button>
+    </div>
+    <div id="lanc-list"></div>
+  </div>
+
+  <!-- ── TAB: IMPORTAR ──────────────────────────────────────────────────── -->
+  <div class="tab-content page" id="tab-imp">
+
+    <!-- Step 1: configurar e colar -->
+    <div id="imp-step1">
+      <div class="section-title">O que você quer importar?</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+        <button class="imp-type-card active" id="iBtn_extrato" onclick="selImpTipo('extrato')">
+          <div class="imp-type-card-icon">🏦</div>
+          <div class="imp-type-card-body">
+            <div class="imp-type-card-title">Extrato bancário</div>
+            <div class="imp-type-card-sub">Itaú, Nubank, Bradesco, Inter, BB, Caixa, C6...</div>
+          </div>
+          <div class="imp-type-card-check" id="iCheck_extrato">✓</div>
+        </button>
+        <button class="imp-type-card" id="iBtn_fatura" onclick="selImpTipo('fatura')">
+          <div class="imp-type-card-icon">💳</div>
+          <div class="imp-type-card-body">
+            <div class="imp-type-card-title">Fatura de cartão</div>
+            <div class="imp-type-card-sub">Latam Pass, Nubank, Inter, Bradesco, Santander...</div>
+          </div>
+          <div class="imp-type-card-check" id="iCheck_fatura" style="opacity:0">✓</div>
+        </button>
+      </div>
+
+      <div id="iCartaoWrap" style="display:none;margin-bottom:16px">
+        <div class="form-label">Qual portador importar?</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
+            <input type="radio" name="cartaoFiltro" value="todos" checked style="accent-color:var(--gr)">
+            <div><div style="font-size:13px;font-weight:600">Todos os portadores</div><div style="font-size:11px;color:var(--mu)">Importa titular e adicionais juntos</div></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
+            <input type="radio" name="cartaoFiltro" value="titular" style="accent-color:var(--gr)">
+            <div><div style="font-size:13px;font-weight:600">Somente titular</div><div style="font-size:11px;color:var(--mu)">Compras do cartão titular</div></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
+            <input type="radio" name="cartaoFiltro" value="adicional" style="accent-color:var(--gr)">
+            <div><div style="font-size:13px;font-weight:600">Somente adicionais</div><div style="font-size:11px;color:var(--mu)">Cartões de dependentes ou cônjuge</div></div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-label">Arquivo ou texto</div>
+      <div class="drop-zone" id="iDropZone"
+        onclick="document.getElementById('iFileInput').click()"
+        ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <div class="drop-zone-icon">📄</div>
+        <div class="drop-zone-title">Toque para escolher o PDF</div>
+        <div class="drop-zone-sub">ou arraste o arquivo aqui</div>
+        <input type="file" id="iFileInput" accept=".pdf,.txt" style="display:none" onchange="handleFileInput(event)">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:12px 0">
+        <div style="flex:1;height:1px;background:var(--bd)"></div>
+        <div style="font-size:11px;color:var(--mu);font-weight:600">ou cole o texto</div>
+        <div style="flex:1;height:1px;background:var(--bd)"></div>
+      </div>
+
+      <textarea class="imp-textarea" id="iTextoRaw"
+        placeholder="Cole aqui o texto copiado do PDF do extrato ou fatura...&#10;&#10;O Finia identifica o formato automaticamente e separa entradas e saídas."></textarea>
+
+      <div class="form-group" style="margin-top:14px">
+        <div class="form-label">Mês de referência</div>
+        <select class="inp" id="iMesRef"></select>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn-main" style="flex:1" onclick="rodarParser()">⚡ Analisar</button>
+        <button style="padding:12px 16px;border-radius:14px;border:1.5px solid #6366f1;background:rgba(99,102,241,.1);color:#a78bfa;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer" onclick="rodarParserIA()" title="IA — funciona com qualquer banco">✨ IA</button>
+        <button class="btn-ghost" style="padding:12px 14px;font-size:11px" onclick="verTextoExtraido()" title="Ver texto extraído">🔍</button>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--mu);text-align:center">
+        ✨ IA lê qualquer banco — Nubank, Bradesco, Inter, BB, Caixa, C6 e mais
+      </div>
+    </div>
+
+    <!-- Step 2: Revisão antes de importar -->
+    <div id="imp-step2" style="display:none">
+      <div style="background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <div style="font-size:15px;font-weight:700" id="iResTitle">0 lançamentos</div>
+            <div style="font-size:11px;color:var(--mu);margin-top:2px" id="iResSub"></div>
+          </div>
+          <button class="cat-edit" onclick="impVoltarStep1()">← Voltar</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="iResumoCats"></div>
+      </div>
+
+      <!-- Aviso de valores suspeitos -->
+      <div id="iAvisoSuspeito" style="display:none;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:12px;padding:12px;margin-bottom:10px;font-size:12px;color:var(--am);line-height:1.6"></div>
+
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="imp-type-btn active" style="flex:1;padding:8px;font-size:11px" id="rfTodos" onclick="filtrarResult('todos',this)">Todos</button>
+        <button class="imp-type-btn" style="flex:1;padding:8px;font-size:11px" id="rfRec" onclick="filtrarResult('rec',this)">Entradas</button>
+        <button class="imp-type-btn" style="flex:1;padding:8px;font-size:11px" id="rfDesp" onclick="filtrarResult('desp',this)">Saídas</button>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer">
+          <input type="checkbox" id="iChkAll" checked onchange="toggleSelectAll(this.checked)" style="accent-color:var(--gr);width:16px;height:16px">
+          Selecionar todos
+        </label>
+        <div id="iSelCount" style="font-size:11px;color:var(--mu)"></div>
+      </div>
+
+      <div id="iLancList"></div>
+
+      <div style="position:sticky;bottom:8px;margin-top:14px">
+        <button class="btn-main" onclick="confirmarImportacao()">✓ Importar selecionados</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── TAB: RELATÓRIOS ────────────────────────────────────────────── -->
+  <div class="tab-content page" id="tab-rel">
+    <div class="period-tabs">
+      <button class="period-tab active" onclick="setPeriod('mes',this)">Mês</button>
+      <button class="period-tab" onclick="setPeriod('trim',this)">Trimestre</button>
+      <button class="period-tab" onclick="setPeriod('ano',this)">Ano</button>
+    </div>
+    <div id="rel-content"></div>
+  </div>
+
+  <!-- ── TAB: CONFIGURAÇÕES ─────────────────────────────────────────── -->
+  <div class="tab-content page" id="tab-cfg">
+    <div class="card">
+      <!-- Banner do plano -->
+      <div id="cfg-free-info" style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(167,139,250,.06));border:1px solid rgba(99,102,241,.2);border-radius:16px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:700;color:#f1f5f9">Plano Free</div>
+          <span style="background:rgba(99,102,241,.15);color:#a78bfa;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;text-transform:uppercase;letter-spacing:.05em">Free</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;line-height:1.7;margin-bottom:12px">
+          20 lançamentos/mês · 2 meses de histórico · 1 importação/mês
+        </div>
+        <button onclick="abrirAtivacaoPro()" style="width:100%;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#6366f1,#a78bfa);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">
+          ✨ Ativar Finia Pro — R$ 19,90/mês
+        </button>
+      </div>
+      <div id="cfg-pro-badge" style="display:none;background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(167,139,250,.08));border:1px solid rgba(99,102,241,.3);border-radius:16px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:24px">⭐</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#a78bfa">Finia Pro ativo</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px">Todos os recursos desbloqueados</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <div class="section-title">Perfil</div>
+        <div class="cfg-item">
+          <div>
+            <div class="cfg-label" id="cfg-nome-label">—</div>
+            <div class="cfg-sub" id="cfg-perfil-label">—</div>
+          </div>
+          <div class="cfg-arrow">›</div>
+        </div>
+      </div>
+      <div class="cfg-section">
+        <div class="section-title">Aparência</div>
+        <div class="cfg-item">
+          <div>
+            <div class="cfg-label">Ocultar valores</div>
+            <div class="cfg-sub">Modo privacidade</div>
+          </div>
+          <button class="toggle" id="tgl-privacidade" onclick="togglePriv(this)"></button>
+        </div>
+      </div>
+      <!-- Seção instalar app -->
+      <div class="cfg-section" id="cfg-instalar-section">
+        <div class="section-title">Instalar app</div>
+        <div id="cfg-instalar-content">
+          <!-- Preenchido dinamicamente pelo JS conforme o dispositivo -->
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <div class="section-title">Categorias</div>
+        <div id="cats-list-cfg"></div>
+        <button class="btn-ghost" style="margin-top:10px" onclick="isPro()?openDrawer('drawer-cat'):showUpgradeModal('Criar categorias é exclusivo do Pro.\n\nAtive para organizar do seu jeito.')">🔒 Nova categoria</button>
+      </div>
+      <div class="cfg-section">
+        <div class="section-title">Meus dados</div>
+
+        <!-- Backup JSON — disponível para todos -->
+        <div class="cfg-item" onclick="exportarBackup()" style="cursor:pointer">
+          <div>
+            <div class="cfg-label">📦 Exportar backup</div>
+            <div class="cfg-sub">Salva todos os seus dados em um arquivo</div>
+          </div>
+          <div class="cfg-arrow">›</div>
+        </div>
+
+        <!-- Restaurar JSON -->
+        <div class="cfg-item" onclick="document.getElementById('importBackupInput').click()" style="cursor:pointer">
+          <div>
+            <div class="cfg-label">📂 Restaurar backup</div>
+            <div class="cfg-sub">Importa dados de outro dispositivo</div>
+          </div>
+          <div class="cfg-arrow">›</div>
+        </div>
+        <input type="file" id="importBackupInput" accept=".json" style="display:none" onchange="importarBackup(event)">
+
+        <!-- Exportar CSV — Pro -->
+        <div class="cfg-item" onclick="exportarCSV()" style="cursor:pointer">
+          <div><div class="cfg-label" id="csv-label">🔒 Exportar CSV</div><div class="cfg-sub">Planilha com todos os lançamentos · Plano Pro</div></div>
+          <div class="cfg-arrow">›</div>
+        </div>
+
+        <!-- Apagar dados -->
+        <div class="cfg-item" onclick="limparDados()" style="cursor:pointer">
+          <div><div class="cfg-label" style="color:var(--rd)">Apagar todos os dados</div><div class="cfg-sub">Remove tudo do dispositivo</div></div>
+          <div class="cfg-arrow" style="color:var(--rd)">›</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /s-app -->
+
+<!-- ── BOTTOM NAV ─────────────────────────────────────────────────────── -->
+<nav class="bottom-nav" id="bottom-nav" style="display:none">
+  <div class="bnav-item active" onclick="navTo('inicio')" id="bnav-inicio">
+    <div class="bnav-icon">🏠</div>
+    <div class="bnav-label">Início</div>
+  </div>
+  <div class="bnav-item" onclick="navTo('lanc')" id="bnav-lanc">
+    <div class="bnav-icon">📋</div>
+    <div class="bnav-label">Lançamentos</div>
+  </div>
+  <div class="bnav-item" onclick="navTo('imp')" id="bnav-imp">
+    <div class="bnav-icon">📥</div>
+    <div class="bnav-label">Importar</div>
+  </div>
+  <div class="bnav-item" onclick="navTo('rel')" id="bnav-rel">
+    <div class="bnav-icon">📊</div>
+    <div class="bnav-label">Relatórios</div>
+  </div>
+  <div class="bnav-item" onclick="navTo('cfg')" id="bnav-cfg">
+    <div class="bnav-icon">⚙️</div>
+    <div class="bnav-label">Config.</div>
+  </div>
+</nav>
+
+<!-- FAB -->
+<button class="fab" id="fab" style="display:none" onclick="openDrawer('drawer-lanc')" title="Novo lançamento">＋</button>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- DRAWERS / MODAIS                                                       -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+
+<!-- Modal: Saldo em conta -->
+<div class="drawer" id="drawerSaldo">
+  <div class="drawer-handle"></div>
+  <div class="drawer-title">💰 Saldo em conta</div>
+  <div class="drawer-body">
+    <div style="font-size:12px;color:var(--mu);margin-bottom:18px;line-height:1.6">
+      Informe o saldo atual da sua conta bancária. Atualize sempre que importar um novo extrato.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Saldo atual (R$)</label>
+      <input type="number" id="fSaldoConta" class="inp" step="0.01" placeholder="0,00"
+        inputmode="decimal"
+        style="font-size:24px;font-weight:700;font-family:'DM Mono',monospace;padding:16px;text-align:center">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Data de referência</label>
+      <input type="date" id="fSaldoData" class="inp">
+    </div>
+  </div>
+  <div class="drawer-btns">
+    <button class="btn-main" style="flex:1" onclick="salvarSaldoConta()">✓ Salvar</button>
+    <button class="btn-ghost" style="width:auto;padding:12px 20px" onclick="closeAllDrawers()">Cancelar</button>
+  </div>
+  <div style="padding:0 20px 8px">
+    <button id="btnLimparSaldo" onclick="limparSaldoConta()"
+      style="display:none;width:100%;padding:11px;border-radius:12px;border:1px solid rgba(248,113,113,.25);background:transparent;color:var(--rd);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:4px">
+      🗑 Remover saldo
+    </button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeAllDrawers()"></div>
+
+<!-- Drawer: Novo/editar lançamento -->
+<div class="drawer" id="drawer-lanc">
+  <div class="drawer-handle"></div>
+  <div class="drawer-title" id="drawer-lanc-title">Novo lançamento</div>
+  <div class="drawer-body">
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="imp-type-btn active" id="lanc-tipo-desp" onclick="selLancTipo('desp')">↑ Saída</button>
+      <button class="imp-type-btn" id="lanc-tipo-rec" onclick="selLancTipo('rec')">↓ Entrada</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Valor (R$)</label>
+      <input class="inp" id="lanc-valor" type="number" step="0.01" placeholder="0,00" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descrição</label>
+      <input class="inp" id="lanc-desc" type="text" placeholder="Ex: Mercado, Salário...">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <select class="inp" id="lanc-cat"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data</label>
+        <input class="inp" id="lanc-data" type="date">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">É parcelado?</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="toggle" id="tgl-parc" onclick="toggleParc(this)"></button>
+        <span style="font-size:12px;color:var(--mu)" id="parc-label">Não</span>
+      </div>
+    </div>
+    <div id="parc-fields" style="display:none">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Parcela atual</label>
+          <input class="inp" id="lanc-parc-atual" type="number" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Total de parcelas</label>
+          <input class="inp" id="lanc-parc-total" type="number" value="12" min="1">
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nota (opcional)</label>
+      <input class="inp" id="lanc-nota" type="text" placeholder="Observação...">
+    </div>
+  </div>
+  <div class="drawer-btns">
+    <button class="btn-main" style="flex:1" onclick="salvarLanc()">Salvar</button>
+    <button class="btn-ghost" style="width:auto;padding:12px 20px" onclick="closeAllDrawers()">Cancelar</button>
+  </div>
+  <!-- Botão apagar — só visível ao editar -->
+  <div style="padding:0 20px 8px" id="lanc-delete-wrap" style="display:none">
+    <button onclick="deleteLanc(document.getElementById('lanc-edit-id').value)"
+      style="width:100%;padding:12px;border-radius:12px;border:1px solid rgba(248,113,113,.3);background:transparent;color:var(--rd);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:4px">
+      🗑 Apagar lançamento
+    </button>
+  </div>
+  <input type="hidden" id="lanc-edit-id">
+</div>
+
+<!-- Drawer: Nova categoria -->
+<div class="drawer" id="drawer-cat">
+  <div class="drawer-handle"></div>
+  <div class="drawer-title" id="drawer-cat-title">Nova categoria</div>
+  <div class="drawer-body">
+    <div class="form-group">
+      <label class="form-label">Nome</label>
+      <input class="inp" id="cat-nome" type="text" placeholder="Ex: Academia, Freelance...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ícone</label>
+      <div class="emoji-grid" id="emoji-grid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Cor</label>
+      <div class="color-grid" id="color-grid"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tipo</label>
+      <div style="display:flex;gap:8px">
+        <button class="imp-type-btn active" id="cat-tipo-desp" onclick="selCatTipo('desp')">Saída</button>
+        <button class="imp-type-btn" id="cat-tipo-rec" onclick="selCatTipo('rec')">Entrada</button>
+        <button class="imp-type-btn" id="cat-tipo-both" onclick="selCatTipo('both')">Ambos</button>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-btns">
+    <button class="btn-main" style="flex:1" onclick="salvarCategoria()">Salvar categoria</button>
+    <button class="btn-ghost" style="width:auto;padding:12px 20px" onclick="closeAllDrawers()">Cancelar</button>
+  </div>
+  <input type="hidden" id="cat-edit-id">
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// FINIA — Estado central
+// ══════════════════════════════════════════════════════════════════════════════
+const DB_KEY = 'finia_v1';
+
+// URL pública do app — substitua pela sua URL do Netlify
+// Exemplo: 'https://meu-finia.netlify.app'
+const APP_URL = (() => {
+  const loc = window.location.href;
+  // Se estiver rodando em URL válida (https ou http), usar ela
+  if(loc.startsWith('http://') || loc.startsWith('https://')){
+    // Remover parâmetros e hash, manter só a URL base
+    return loc.split('?')[0].split('#')[0];
+  }
+  // Fallback: URL do Netlify (edite aqui com a sua URL)
+  return 'https://friendly-kataifi-45dd66.netlify.app';
+})();
+const PRO_KEY = 'finia_pro_v1'; // chave de ativação Pro
+
+// Limites da versão Free
+const FREE_LIMITS = {
+  lancamentosPorMes: 20,    // máx lançamentos manuais/mês
+  mesesHistorico:    2,     // meses de histórico visíveis
+  importacoesMes:    1,     // importações por mês
+  importacaoLancs:   30,    // lançamentos por importação
+  categoriasCustom:  0,     // categorias criadas pelo usuário
+};
+
+let DB = {
+  user: null,
+  categorias: [],
+  lancamentos: {},
+  settings: {privacidade: false},
+  pro: {ativo: false, codigo: '', ativadoEm: null},
+  uso: {importacoesMes: {}, lancamentosMes: {}},
+  saldoConta: null,        // saldo real da conta bancária
+  saldoContaData: null,    // data de referência do saldo
+};
+
+// Verificar se o usuário é Pro
+function isPro(){
+  return DB.pro && DB.pro.ativo === true;
+}
+
+// Verificar limite e retornar {ok, msg}
+function checarLimite(tipo, mes){
+  if(isPro()) return {ok:true};
+  const m = mes || currentMes;
+  switch(tipo){
+    case 'lancamento': {
+      const total = (DB.lancamentos[m]||[]).length;
+      if(total >= FREE_LIMITS.lancamentosPorMes)
+        return {ok:false, msg:`Limite de ${FREE_LIMITS.lancamentosPorMes} lançamentos por mês atingido no plano Free.
+
+Ative o Pro para lançamentos ilimitados.`};
+      return {ok:true};
+    }
+    case 'importacao': {
+      const mes_atual = m.substring(0,7);
+      const imp = (DB.uso.importacoesMes||{})[mes_atual]||0;
+      if(imp >= FREE_LIMITS.importacoesMes)
+        return {ok:false, msg:`Você já usou ${FREE_LIMITS.importacoesMes} importação este mês no plano Free.
+
+Ative o Pro para importações ilimitadas.`};
+      return {ok:true};
+    }
+    case 'importacaoLancs': {
+      const n = typeof mes === 'number' ? mes : 0;
+      if(n > FREE_LIMITS.importacaoLancs)
+        return {ok:false, msg:`O plano Free importa até ${FREE_LIMITS.importacaoLancs} lançamentos por vez.
+
+Foram detectados ${n}. Ative o Pro para importar todos de uma vez, ou selecione até ${FREE_LIMITS.importacaoLancs}.`};
+      return {ok:true};
+    }
+    case 'categoria':
+      return {ok:false, msg:'Criar categorias personalizadas é exclusivo do plano Pro. Ative o Pro para organizar do seu jeito.'};
+    case 'historico': {
+      const meses = sortedMonths();
+      const idx = meses.indexOf(m);
+      if(idx !== -1 && idx < meses.length - FREE_LIMITS.mesesHistorico)
+        return {ok:false, msg:`O plano Free exibe até ${FREE_LIMITS.mesesHistorico} meses de histórico.
+
+Ative o Pro para acessar todo o seu histórico.`};
+      return {ok:true};
+    }
+    case 'relatorio_periodo':
+      return {ok:false, msg:'Relatórios trimestrais e anuais são exclusivos do Pro. Ative para ver sua evolução completa.'};
+    case 'csv':
+      return {ok:false, msg:'Exportar CSV é exclusivo do plano Pro.'};
+    default:
+      return {ok:true};
+  }
+}
+
+// Mostrar modal de upgrade
+function showUpgradeModal(msg){
+  const m = document.createElement('div');
+  m.id='upgradeModal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:0 0 0 0';
+  m.innerHTML=`
+    <div style="background:#1e293b;border-radius:24px 24px 0 0;padding:28px 24px 36px;width:100%;max-width:430px;border-top:1px solid #334155">
+      <div style="width:36px;height:4px;background:#334155;border-radius:2px;margin:0 auto 20px"></div>
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:36px;margin-bottom:10px">⭐</div>
+        <div style="font-size:18px;font-weight:800;color:#f1f5f9;margin-bottom:8px">Recurso Pro</div>
+        <div style="font-size:13px;color:#94a3b8;line-height:1.6;white-space:pre-line">${msg}</div>
+      </div>
+      <div style="background:linear-gradient(135deg,#1a1040,#0f172a);border:1px solid rgba(99,102,241,.3);border-radius:16px;padding:16px;margin-bottom:16px;text-align:center">
+        <div style="font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Finia Pro</div>
+        <div style="font-size:28px;font-weight:800;color:#fff;margin-bottom:2px">R$ 19,90<span style="font-size:14px;font-weight:400;color:#64748b">/mês</span></div>
+        <div style="font-size:11px;color:#64748b">ou R$ 97/ano — menos de R$ 8/mês</div>
+      </div>
+      <button onclick="abrirAtivacaoPro()" style="width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(135deg,#6366f1,#a78bfa);color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:10px">
+        ✨ Ativar Pro agora
+      </button>
+      <button onclick="document.getElementById('upgradeModal').remove()" style="width:100%;padding:12px;border-radius:14px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+        Continuar no Free
+      </button>
+    </div>`;
+  m.onclick=(e)=>{ if(e.target===m) m.remove(); };
+  document.body.appendChild(m);
+}
+
+function abrirAtivacaoPro(){
+  const m = document.getElementById('upgradeModal');
+  if(m) m.remove();
+  const d = document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  d.innerHTML=`
+    <div style="background:#1e293b;border-radius:24px 24px 0 0;padding:28px 24px 36px;width:100%;max-width:430px;border-top:1px solid #334155">
+      <div style="width:36px;height:4px;background:#334155;border-radius:2px;margin:0 auto 20px"></div>
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:6px">Ativar Finia Pro</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:20px;line-height:1.6">Após o pagamento você receberá um código de ativação. Digite-o abaixo.</div>
+      <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Código de ativação</div>
+      <input id="proCodigoInput" type="text" placeholder="FINIA-XXXX-XXXX"
+        style="width:100%;background:#0f172a;border:1.5px solid #334155;border-radius:12px;padding:14px;color:#f1f5f9;font-size:15px;font-family:'DM Mono',monospace;letter-spacing:.1em;outline:none;margin-bottom:16px;text-transform:uppercase"
+        oninput="this.value=this.value.toUpperCase()">
+      <button onclick="tentarAtivarPro()" style="width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(135deg,#6366f1,#a78bfa);color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:10px">
+        Ativar
+      </button>
+      <button onclick="this.closest('div[style]').remove()" style="width:100%;padding:12px;border-radius:14px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+        Cancelar
+      </button>
+    </div>`;
+  d.onclick=(e)=>{ if(e.target===d) d.remove(); };
+  document.body.appendChild(d);
+  setTimeout(()=>document.getElementById('proCodigoInput')?.focus(),100);
+}
+
+// Validação do código Pro (hash simples — em produção viria de API)
+function validarCodigo(codigo){
+  // Códigos válidos: prefixo FINIA- + qualquer sequência de 9 chars
+  // Em produção: verificar contra servidor
+  const limpo = codigo.trim().toUpperCase();
+  if(!limpo.startsWith('FINIA-')) return false;
+  if(limpo.length < 10) return false;
+  // Algoritmo simples: soma dos char codes deve ser divisível por 7
+  const parte = limpo.replace('FINIA-','').replace(/-/g,'');
+  const soma = [...parte].reduce((s,c)=>s+c.charCodeAt(0),0);
+  return soma % 7 === 0;
+}
+
+function tentarAtivarPro(){
+  const input = document.getElementById('proCodigoInput');
+  const codigo = input ? input.value.trim().toUpperCase() : '';
+  if(!codigo){ showToast('Digite o código de ativação'); return; }
+  if(validarCodigo(codigo)){
+    DB.pro = {ativo:true, codigo, ativadoEm: new Date().toISOString()};
+    dbSave();
+    // Fechar modal
+    document.querySelectorAll('div[style*="z-index:9999"]').forEach(el=>el.remove());
+    renderBadgePro();
+    showToast('🎉 Finia Pro ativado com sucesso!');
+    // Recarregar aba atual e ativar IA
+    if(currentTab) navTo(currentTab);
+    if(currentTab === 'inicio' || !currentTab) gerarInsightIA();
+  } else {
+    showToast('Código inválido. Verifique e tente novamente.');
+    if(input){ input.style.borderColor='#f87171'; setTimeout(()=>input.style.borderColor='#334155',2000); }
+  }
+}
+
+function renderBadgePro(){
+  const av = document.getElementById('user-avatar');
+  if(!av) return;
+  if(isPro()){
+    av.style.background='linear-gradient(135deg,#6366f1,#a78bfa)';
+    av.title='Finia Pro ativo ✨';
+  }
+  // Badge na config
+  const badge = document.getElementById('cfg-pro-badge');
+  if(badge) badge.style.display = isPro() ? '' : 'none';
+  const freeInfo = document.getElementById('cfg-free-info');
+  if(freeInfo) freeInfo.style.display = isPro() ? 'none' : '';
+  // Botão IA — mostrar/ocultar conforme Pro
+  const aiBtn = document.getElementById('ai-chat-btn');
+  if(aiBtn) aiBtn.style.display = isPro() ? 'flex' : 'none';
+}
+
+const CATS_DEFAULT = [
+  {id:'c1',nome:'Alimentação',icone:'🍽️',cor:'#f87171',tipo:'desp'},
+  {id:'c2',nome:'Mercado',icone:'🛒',cor:'#fb923c',tipo:'desp'},
+  {id:'c3',nome:'Transporte',icone:'🚗',cor:'#fbbf24',tipo:'desp'},
+  {id:'c4',nome:'Saúde',icone:'💊',cor:'#34d399',tipo:'desp'},
+  {id:'c5',nome:'Moradia',icone:'🏠',cor:'#60a5fa',tipo:'desp'},
+  {id:'c6',nome:'Lazer',icone:'🎬',cor:'#a78bfa',tipo:'desp'},
+  {id:'c7',nome:'Educação',icone:'📚',cor:'#38bdf8',tipo:'desp'},
+  {id:'c8',nome:'Roupas',icone:'👗',cor:'#f472b6',tipo:'desp'},
+  {id:'c9',nome:'Assinaturas',icone:'📱',cor:'#94a3b8',tipo:'desp'},
+  {id:'c10',nome:'Outros gastos',icone:'💸',cor:'#64748b',tipo:'desp'},
+  {id:'c11',nome:'Salário',icone:'💰',cor:'#22d3a5',tipo:'rec'},
+  {id:'c12',nome:'Freelance',icone:'💼',cor:'#818cf8',tipo:'rec'},
+  {id:'c13',nome:'Investimentos',icone:'📈',cor:'#4ade80',tipo:'rec'},
+  {id:'c14',nome:'Outros ganhos',icone:'🎁',cor:'#2dd4bf',tipo:'rec'},
+];
+
+const EMOJIS = ['🍽️','🛒','🚗','💊','🏠','🎬','📚','👗','📱','💸','💰','💼','📈','🎁','✈️','🏥','⚽','🎮','🐶','👶','💅','🔧','🏋️','☕','🍺','🎵','🛍️','💻','📷','🎯'];
+const COLORS = ['#f87171','#fb923c','#fbbf24','#a3e635','#34d399','#22d3a5','#38bdf8','#60a5fa','#818cf8','#a78bfa','#f472b6','#94a3b8','#64748b','#6366f1','#06b6d4'];
+
+let currentTab = 'inicio';
+let currentMes = '';  // 'YYYY-MM'
+let impTipo = 'extrato';
+let parsedItems = [];
+let resultFiltro = 'todos';
+let lancTipo = 'desp';
+let catTipo = 'desp';
+let emojiSel = '💸';
+let colorSel = '#6366f1';
+let periodMode = 'mes';
+let lancFiltro = 'todos';
+let editLancId = null;
+let editCatId = null;
+let privMode = false;
+
+// ── PERSISTÊNCIA ──────────────────────────────────────────────────────────────
+// Storage: tenta localStorage, cai para memória se bloqueado (ex: file://)
+let _memStore = {};
+const storage = {
+  getItem(k){ try{ return localStorage.getItem(k); }catch{ return _memStore[k]||null; } },
+  setItem(k,v){ try{ localStorage.setItem(k,v); }catch{ _memStore[k]=v; } },
+  removeItem(k){ try{ localStorage.removeItem(k); }catch{ delete _memStore[k]; } },
+  clear(){ try{ localStorage.clear(); }catch{ _memStore={}; } }
+};
+
+function dbLoad(){
+  try{
+    const raw = storage.getItem(DB_KEY);
+    if(raw) DB = {...DB, ...JSON.parse(raw)};
+  }catch{}
+}
+function dbSave(){ try{ storage.setItem(DB_KEY, JSON.stringify(DB)); }catch{} }
+
+// ── FORMATAÇÃO ────────────────────────────────────────────────────────────────
+function fmtV(v){
+  if(privMode) return '•••••';
+  return 'R$ '+Math.abs(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtVRaw(v){
+  return 'R$ '+Math.abs(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function mesLabel(ym){
+  if(!ym) return '';
+  const [y,m] = ym.split('-');
+  const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return (meses[parseInt(m)-1]||'')+'/'+y;
+}
+function ymFromLabel(label){
+  const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const [m,y] = label.split('/');
+  const mi = meses.indexOf(m);
+  if(mi<0||!y) return '';
+  return y+'-'+String(mi+1).padStart(2,'0');
+}
+function hoje(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function mesAtual(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function uid(){ return '_'+Math.random().toString(36).substr(2,9); }
+
+// ── ONBOARDING ────────────────────────────────────────────────────────────────
+function obNext(step){
+  // Salvar dados do passo anterior
+  if(step===2){
+    const el = document.getElementById('ob-nome');
+    const nome = el ? el.value.trim() : '';
+    if(!nome){ alert('Digite seu nome para continuar.'); return; }
+    DB.user = {nome: nome, perfil: 'pessoal', renda: '2a5', bancos: []};
+    const sel = document.querySelector('#ob-perfil-chips .chip.sel');
+    if(sel) DB.user.perfil = sel.dataset.v;
+  }
+  if(step===3){
+    const rEl = document.getElementById('ob-renda');
+    if(rEl) DB.user.renda = rEl.value;
+    DB.user.bancos = [...document.querySelectorAll('#ob-banco-chips .chip.sel')].map(c=>c.dataset.v);
+    // Popular categorias (só se ainda vazio)
+    const wrap = document.getElementById('ob-cats-chips');
+    if(wrap && !wrap.hasChildNodes()){
+      CATS_DEFAULT.forEach(c=>{
+        const el = document.createElement('div');
+        el.className='chip sel';
+        el.dataset.v=c.id;
+        el.textContent=c.icone+' '+c.nome;
+        el.onclick=(e)=>{ e.stopPropagation(); el.classList.toggle('sel'); };
+        wrap.appendChild(el);
+      });
+    }
+  }
+  // Trocar passo visível
+  document.querySelectorAll('.ob-step').forEach(s=>s.classList.remove('active'));
+  const alvo = document.getElementById('ob'+step);
+  if(alvo) alvo.classList.add('active');
+  // Atualizar dots
+  document.querySelectorAll('.ob-dot').forEach((d,i)=>{ d.classList.toggle('active', i===step-1); });
+}
+
+
+function obFinalizar(){
+  const sels = [...document.querySelectorAll('#ob-cats-chips .chip.sel')].map(c=>c.dataset.v);
+  DB.categorias = CATS_DEFAULT.filter(c=>sels.includes(c.id));
+  if(!DB.categorias.length) DB.categorias = [...CATS_DEFAULT];
+  currentMes = mesAtual();
+  dbSave();
+  initApp();
+}
+
+// Chips de categorias — só ativa dentro do ob-cats-chips
+document.addEventListener('click', e=>{
+  if(e.target.classList.contains('chip') && e.target.closest('#ob-cats-chips')){
+    e.stopPropagation();
+    e.target.classList.toggle('sel');
+  }
+});
+
+// ── INIT APP ──────────────────────────────────────────────────────────────────
+function initApp(){
+  document.getElementById('s-onboard').classList.remove('active');
+  document.getElementById('s-app').classList.add('active');
+  document.getElementById('bottom-nav').style.display='flex';
+  document.getElementById('fab').style.display='flex';
+  currentMes = currentMes || mesAtual();
+  if(!DB.lancamentos[currentMes]) DB.lancamentos[currentMes]=[];
+
+  // Avatar
+  const av = document.getElementById('user-avatar');
+  if(DB.user?.nome) av.textContent = DB.user.nome[0].toUpperCase();
+
+  privMode = DB.settings?.privacidade||false;
+  if(privMode) document.getElementById('tgl-privacidade').classList.add('on');
+
+  renderBadgePro();
+  renderMesLabel();
+  // Mostrar botão IA (só Pro)
+  if(isPro()){
+    const btn = document.getElementById('ai-chat-btn');
+    if(btn) btn.style.display='flex';
+  }
+  navTo('inicio');
+  initImpMes();
+  renderCfgCats();
+  renderCfgPerfil();
+}
+
+// ── NAVEGAÇÃO ─────────────────────────────────────────────────────────────────
+function navTo(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  const bnav = document.getElementById('bnav-'+tab);
+  if(bnav) bnav.classList.add('active');
+
+  const titles = {inicio:'Início',lanc:'Lançamentos',imp:'Importar',rel:'Relatórios',cfg:'Configurações'};
+  document.getElementById('topbar-title').textContent = titles[tab]||tab;
+
+  const mnav = document.getElementById('month-nav');
+  mnav.style.display = (tab==='inicio'||tab==='lanc') ? 'flex' : 'none';
+
+  const fab = document.getElementById('fab');
+  fab.style.display = (tab==='inicio'||tab==='lanc') ? 'flex' : 'none';
+
+  if(tab==='inicio')  { renderInicio(); if(isPro()) gerarInsightIA(); }
+  if(tab==='lanc')    renderLanc();
+  if(tab==='rel')     renderRel();
+  if(tab==='imp')     initImpMes();
+  if(tab==='cfg')     renderInstallSection();
+}
+
+// ── MÊS ───────────────────────────────────────────────────────────────────────
+function renderMesLabel(){
+  document.getElementById('month-label').textContent = mesLabel(currentMes);
+  document.getElementById('topbar-sub').textContent = mesLabel(currentMes);
+}
+function mesAnterior(){
+  const [y,m]=currentMes.split('-').map(Number);
+  const d=new Date(y,m-2,1);
+  currentMes=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  if(!DB.lancamentos[currentMes]) DB.lancamentos[currentMes]=[];
+  renderMesLabel();
+  if(currentTab==='inicio') renderInicio();
+  if(currentTab==='lanc')   renderLanc();
+}
+function mesSeguinte(){
+  const [y,m]=currentMes.split('-').map(Number);
+  const d=new Date(y,m,1);
+  currentMes=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  if(!DB.lancamentos[currentMes]) DB.lancamentos[currentMes]=[];
+  renderMesLabel();
+  if(currentTab==='inicio') renderInicio();
+  if(currentTab==='lanc')   renderLanc();
+}
+function getLancs(ym){ return DB.lancamentos[ym]||[]; }
+function tRec(ym){ return getLancs(ym).filter(l=>l.tipo==='rec').reduce((s,l)=>s+l.valor,0); }
+function tDesp(ym){ return getLancs(ym).filter(l=>l.tipo==='desp').reduce((s,l)=>s+l.valor,0); }
+function saldo(ym){ return tRec(ym)-tDesp(ym); }
+
+// ── TELA INÍCIO ───────────────────────────────────────────────────────────────
+function calcularSaldoAtual(){
+  // Calcula o saldo atual da conta:
+  // saldoConta (base) + todas as entradas - todas as saídas APÓS a data do saldo
+  if(DB.saldoConta == null) return null;
+  const dataBase = DB.saldoContaData || '2000-01-01';
+  let saldoCalc = DB.saldoConta;
+  // Somar todos os lançamentos após a data base
+  Object.entries(DB.lancamentos).forEach(([ym, lancs]) => {
+    lancs.forEach(l => {
+      if(!l.data) return;
+      // Normalizar data do lançamento para YYYY-MM-DD
+      const dataLanc = l.data.includes('-') ? l.data
+        : l.data.split('/').length===3
+          ? `${l.data.split('/')[2]}-${l.data.split('/')[1].padStart(2,'0')}-${l.data.split('/')[0].padStart(2,'0')}`
+          : `${ym}-${(l.data.split('/')[1]||'01').padStart(2,'0')}-${l.data.split('/')[0].padStart(2,'0')}`;
+      // Só considerar lançamentos APÓS a data base do saldo
+      if(dataLanc > dataBase){
+        if(l.tipo === 'rec')  saldoCalc += l.valor;
+        if(l.tipo === 'desp') saldoCalc -= l.valor;
+      }
+    });
+  });
+  return saldoCalc;
+}
+
+function renderInicio(){
+  const ym = currentMes;
+  const rec = tRec(ym), desp = tDesp(ym), sal = saldo(ym);
+  const lancs = getLancs(ym);
+
+  // Calcular saldo atual dinamicamente
+  const temSaldoConta  = DB.saldoConta !== null && DB.saldoConta !== undefined;
+  const saldoAtual     = temSaldoConta ? calcularSaldoAtual() : null;
+  const saldoAtualStr  = saldoAtual !== null ? fmtV(saldoAtual) : '—';
+  const saldoBaseData  = DB.saldoContaData
+    ? new Date(DB.saldoContaData+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})
+    : '';
+
+  document.getElementById('hero-wrap').innerHTML=`
+    <div class="hero-card fade-up">
+      ${temSaldoConta ? `
+      <!-- Saldo calculado dinamicamente -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+        <div class="hero-label">Saldo em conta</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3);cursor:pointer" onclick="abrirModalSaldo()">✎ atualizar base</div>
+      </div>
+      <div class="hero-value ${saldoAtual>=0?'pos':'neg'}" style="margin-bottom:6px">${saldoAtualStr}</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.3);margin-bottom:16px">Base: ${fmtV(DB.saldoConta)} em ${saldoBaseData} + lançamentos</div>
+      <div style="height:1px;background:rgba(255,255,255,.08);margin-bottom:14px"></div>
+      ` : `
+      <!-- Sem saldo base — botão para inserir -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div class="hero-label" style="margin-bottom:4px">Saldo em conta</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.35)">Insira o saldo atual para acompanhar em tempo real</div>
+        </div>
+        <button onclick="abrirModalSaldo()" style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap">
+          + Inserir
+        </button>
+      </div>
+      `}
+      <!-- Resultado do mês -->
+      <div class="hero-label" style="margin-bottom:4px">Resultado do mês</div>
+      <div class="hero-value ${sal>=0?'pos':'neg'}" style="font-size:26px;margin-bottom:12px">${fmtV(sal)}</div>
+      <div class="hero-row">
+        <div class="hero-stat">
+          <div class="hero-stat-l">Entradas</div>
+          <div class="hero-stat-v" style="color:var(--gr)">${fmtV(rec)}</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-l">Saídas</div>
+          <div class="hero-stat-v" style="color:var(--rd)">${fmtV(desp)}</div>
+        </div>
+      </div>
+    </div>`;
+
+  // Barra de uso Free (só mostra se não for Pro)
+  const usoHtml = !isPro() ? (()=>{
+    const total = lancs.length;
+    const max = FREE_LIMITS.lancamentosPorMes;
+    const pct = Math.min(100, (total/max)*100);
+    const cor = pct>=100?'var(--rd)':pct>=75?'var(--am)':'var(--gr)';
+    return `<div style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+          <div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em">Lançamentos este mês</div>
+          <div style="font-size:10px;font-weight:700;color:${cor}">${total}/${max}</div>
+        </div>
+        <div style="height:4px;background:var(--s2);border-radius:2px"><div style="width:${pct}%;height:100%;background:${cor};border-radius:2px;transition:width .4s"></div></div>
+      </div>
+      ${pct>=75?`<button onclick="showUpgradeModal('Você está chegando ao limite do plano Free.\n\nAtive o Pro para lançamentos ilimitados.')" style="padding:6px 10px;border-radius:8px;border:none;background:linear-gradient(135deg,#6366f1,#a78bfa);color:#fff;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">Ver Pro</button>`:''}
+    </div>`;
+  })() : '';
+
+  // KPIs
+  const parcAtivas = lancs.filter(l=>l.parcTotal>1&&l.tipo==='desp');
+  const totalParc = parcAtivas.reduce((s,l)=>s+l.valor,0);
+  const cats = DB.categorias.filter(c=>c.tipo==='desp'||c.tipo==='both');
+  const topCat = (() => {
+    const map={};
+    lancs.filter(l=>l.tipo==='desp').forEach(l=>{ map[l.catId]=(map[l.catId]||0)+l.valor; });
+    const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]);
+    if(!sorted.length) return '—';
+    const cat=DB.categorias.find(c=>c.id===sorted[0][0]);
+    return cat ? cat.icone+' '+cat.nome : '—';
+  })();
+  const txEcon = rec>0 ? Math.max(0,(sal/rec)*100) : 0;
+
+  document.getElementById('hero-wrap').insertAdjacentHTML('afterend', usoHtml);
+  document.getElementById('kpis-wrap').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-icon">📦</div>
+        <div class="kpi-label">Parcelas ativas</div>
+        <div class="kpi-value" style="color:var(--am)">${fmtV(totalParc)}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">🏆</div>
+        <div class="kpi-label">Maior gasto</div>
+        <div class="kpi-value" style="font-size:13px">${topCat}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">💾</div>
+        <div class="kpi-label">Taxa de economia</div>
+        <div class="kpi-value" style="color:${txEcon>=20?'var(--gr)':'var(--rd)'}">${txEcon.toFixed(0)}%</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon">🧾</div>
+        <div class="kpi-label">Lançamentos</div>
+        <div class="kpi-value">${lancs.length}</div>
+      </div>
+    </div>`;
+
+  // Últimos lançamentos
+  const ultimos = [...lancs].sort((a,b)=>b.data.localeCompare(a.data)).slice(0,5);
+  document.getElementById('ultimos-wrap').innerHTML = ultimos.length
+    ? ultimos.map(l=>lancHTML(l)).join('')
+    : '<div class="empty" style="padding:24px"><div class="empty-icon">📭</div><div class="empty-sub">Nenhum lançamento ainda.<br>Toque em ＋ para adicionar.</div></div>';
+
+  // Gastos por categoria (barras)
+  const catMap={};
+  lancs.filter(l=>l.tipo==='desp').forEach(l=>{ catMap[l.catId]=(catMap[l.catId]||0)+l.valor; });
+  const sortedCats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const maxVal = sortedCats[0]?.[1]||1;
+  document.getElementById('cats-wrap').innerHTML = sortedCats.length
+    ? '<div class="bar-chart">'+sortedCats.map(([cid,val])=>{
+        const cat=DB.categorias.find(c=>c.id===cid)||{icone:'💸',nome:'Outros',cor:'#64748b'};
+        const pct=(val/maxVal*100).toFixed(0);
+        return `<div class="bar-item">
+          <div class="bar-header"><div class="bar-label">${cat.icone} ${cat.nome}</div><div class="bar-val">${fmtV(val)}</div></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${cat.cor}"></div></div>
+        </div>`;
+      }).join('')+'</div>'
+    : '<div class="empty" style="padding:20px"><div class="empty-icon">📊</div><div class="empty-sub">Adicione lançamentos para ver seus gastos por categoria.</div></div>';
+}
+
+// ── LANÇAMENTOS ───────────────────────────────────────────────────────────────
+function lancHTML(l){
+  const cat = DB.categorias.find(c=>c.id===l.catId)||{icone:'💸',nome:'Outros',cor:'#64748b'};
+  const dataFmt = l.data ? new Date(l.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
+  const parcInfo = l.parcTotal>1 ? ` · ${l.parcAtual}/${l.parcTotal}` : '';
+  return `<div class="lanc-item" onclick="editLanc('${l.id}')">
+    <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
+    <div class="lanc-info">
+      <div class="lanc-desc">${l.desc}</div>
+      <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt}</div>
+    </div>
+    <div class="lanc-val ${l.tipo}">${l.tipo==='rec'?'+':'-'}${fmtV(l.valor)}</div>
+  </div>`;
+}
+
+function renderLanc(){
+  const lancs = getLancs(currentMes)
+    .filter(l=> lancFiltro==='todos' || l.tipo===lancFiltro)
+    .sort((a,b)=>b.data.localeCompare(a.data));
+  document.getElementById('lanc-list').innerHTML = lancs.length
+    ? '<div class="card" style="padding:4px 16px">'+lancs.map(l=>lancHTML(l)).join('')+'</div>'
+    : '<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">Nenhum lançamento</div><div class="empty-sub">Toque em ＋ ou importe um extrato.</div></div>';
+}
+
+function filtLanc(tipo,btn){
+  lancFiltro=tipo;
+  document.querySelectorAll('#tab-lanc .imp-type-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLanc();
+}
+
+// ── DRAWER: LANÇAMENTO ────────────────────────────────────────────────────────
+function openDrawer(id){
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById(id).classList.add('open');
+  if(id==='drawer-lanc') prepDrawerLanc();
+  if(id==='drawer-cat')  prepDrawerCat();
+}
+function closeAllDrawers(){
+  document.querySelectorAll('.drawer').forEach(d=>d.classList.remove('open'));
+  document.getElementById('overlay').classList.remove('open');
+  editLancId=null; editCatId=null;
+}
+
+function prepDrawerLanc(){
+  const hoje_ = hoje();
+  document.getElementById('lanc-data').value = hoje_;
+  document.getElementById('lanc-valor').value='';
+  document.getElementById('lanc-desc').value='';
+  document.getElementById('lanc-nota').value='';
+  document.getElementById('lanc-edit-id').value='';
+  document.getElementById('drawer-lanc-title').textContent='Novo lançamento';
+  const dw = document.getElementById('lanc-delete-wrap');
+  if(dw) dw.style.display='none';
+  selLancTipo('desp');
+  renderLancCats();
+  // Resetar parcela
+  const tgl=document.getElementById('tgl-parc');
+  tgl.classList.remove('on');
+  document.getElementById('parc-label').textContent='Não';
+  document.getElementById('parc-fields').style.display='none';
+}
+
+function editLanc(id){
+  const lanc = getLancs(currentMes).find(l=>l.id===id);
+  if(!lanc) return;
+  editLancId=id;
+  openDrawer('drawer-lanc');
+  document.getElementById('drawer-lanc-title').textContent='Editar lançamento';
+  document.getElementById('lanc-edit-id').value=id;
+  const dw = document.getElementById('lanc-delete-wrap');
+  if(dw) dw.style.display='';
+  document.getElementById('lanc-valor').value=lanc.valor;
+  document.getElementById('lanc-desc').value=lanc.desc;
+  document.getElementById('lanc-nota').value=lanc.nota||'';
+  document.getElementById('lanc-data').value=lanc.data;
+  selLancTipo(lanc.tipo);
+  renderLancCats();
+  document.getElementById('lanc-cat').value=lanc.catId;
+  if(lanc.parcTotal>1){
+    document.getElementById('tgl-parc').classList.add('on');
+    document.getElementById('parc-label').textContent='Sim';
+    document.getElementById('parc-fields').style.display='';
+    document.getElementById('lanc-parc-atual').value=lanc.parcAtual||1;
+    document.getElementById('lanc-parc-total').value=lanc.parcTotal||1;
+  }
+}
+
+function selLancTipo(tipo){
+  lancTipo=tipo;
+  document.getElementById('lanc-tipo-desp').classList.toggle('active',tipo==='desp');
+  document.getElementById('lanc-tipo-rec').classList.toggle('active',tipo==='rec');
+  renderLancCats();
+}
+
+function renderLancCats(){
+  const sel=document.getElementById('lanc-cat');
+  sel.innerHTML='';
+  DB.categorias.filter(c=>c.tipo===lancTipo||c.tipo==='both').forEach(c=>{
+    const o=document.createElement('option');
+    o.value=c.id; o.textContent=c.icone+' '+c.nome;
+    sel.appendChild(o);
+  });
+}
+
+function toggleParc(btn){
+  btn.classList.toggle('on');
+  const on=btn.classList.contains('on');
+  document.getElementById('parc-label').textContent=on?'Sim':'Não';
+  document.getElementById('parc-fields').style.display=on?'':'none';
+}
+
+function salvarLanc(){
+  const valor=parseFloat(document.getElementById('lanc-valor').value);
+  const desc=document.getElementById('lanc-desc').value.trim();
+  const data=document.getElementById('lanc-data').value;
+  const catId=document.getElementById('lanc-cat').value;
+  if(!valor||isNaN(valor)){ showToast('Informe o valor 💰'); return; }
+  if(!desc){ showToast('Informe a descrição'); return; }
+  // Verificar limite Free (só para novos lançamentos, não edição)
+  if(!editLancId){
+    const lim = checarLimite('lancamento', currentMes);
+    if(!lim.ok){ closeAllDrawers(); showUpgradeModal(lim.msg); return; }
+  }
+  const parcOn=document.getElementById('tgl-parc').classList.contains('on');
+  const lanc={
+    id: editLancId||uid(),
+    data, desc, valor, tipo:lancTipo, catId,
+    parcAtual: parcOn?parseInt(document.getElementById('lanc-parc-atual').value)||1:1,
+    parcTotal: parcOn?parseInt(document.getElementById('lanc-parc-total').value)||1:1,
+    nota: document.getElementById('lanc-nota').value.trim()
+  };
+  if(!DB.lancamentos[currentMes]) DB.lancamentos[currentMes]=[];
+  if(editLancId){
+    const idx=DB.lancamentos[currentMes].findIndex(l=>l.id===editLancId);
+    if(idx>=0) DB.lancamentos[currentMes][idx]=lanc;
+  } else {
+    DB.lancamentos[currentMes].push(lanc);
+  }
+  dbSave(); closeAllDrawers();
+  showToast(editLancId?'Lançamento atualizado ✓':'Lançamento salvo ✓');
+  if(currentTab==='inicio') renderInicio();
+  if(currentTab==='lanc')   renderLanc();
+}
+
+function deleteLanc(id){
+  if(!id){ showToast('Nenhum lançamento selecionado'); return; }
+  // Fechar drawer e mostrar modal de confirmação
+  closeAllDrawers();
+  const modal = document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.innerHTML=`
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center">
+      <div style="font-size:32px;margin-bottom:12px">🗑</div>
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Apagar lançamento?</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6">Essa ação não pode ser desfeita.</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="confirmarDeleteLanc('${id}');this.closest('div[style]').remove()"
+          style="padding:14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">
+          Sim, apagar
+        </button>
+        <button onclick="this.closest('div[style]').remove()"
+          style="padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+          Cancelar
+        </button>
+      </div>
+    </div>`;
+  modal.onclick=(e)=>{if(e.target===modal)modal.remove();};
+  document.body.appendChild(modal);
+}
+
+function confirmarDeleteLanc(id){
+  // Procurar em todos os meses (pode ser editado em mês diferente)
+  let found = false;
+  Object.keys(DB.lancamentos).forEach(ym=>{
+    const antes = DB.lancamentos[ym].length;
+    DB.lancamentos[ym] = DB.lancamentos[ym].filter(l=>l.id!==id);
+    if(DB.lancamentos[ym].length < antes) found = true;
+  });
+  if(found){
+    dbSave();
+    showToast('Lançamento apagado ✓');
+    if(currentTab==='inicio') renderInicio();
+    if(currentTab==='lanc')   renderLanc();
+  }
+}
+
+// ── DRAWER: CATEGORIA ─────────────────────────────────────────────────────────
+function prepDrawerCat(){
+  emojiSel=EMOJIS[0]; colorSel=COLORS[0]; catTipo='desp';
+  document.getElementById('cat-nome').value='';
+  document.getElementById('cat-edit-id').value='';
+  document.getElementById('drawer-cat-title').textContent='Nova categoria';
+  renderEmojiGrid(); renderColorGrid();
+  selCatTipo('desp');
+}
+
+function renderEmojiGrid(){
+  document.getElementById('emoji-grid').innerHTML=EMOJIS.map(e=>
+    `<button class="emoji-opt${e===emojiSel?' sel':''}" onclick="selEmoji('${e}')">${e}</button>`
+  ).join('');
+}
+function selEmoji(e){ emojiSel=e; renderEmojiGrid(); }
+
+function renderColorGrid(){
+  document.getElementById('color-grid').innerHTML=COLORS.map(c=>
+    `<div class="color-opt${c===colorSel?' sel':''}" style="background:${c}" onclick="selColor('${c}')"></div>`
+  ).join('');
+}
+function selColor(c){ colorSel=c; renderColorGrid(); }
+
+function selCatTipo(tipo){
+  catTipo=tipo;
+  ['desp','rec','both'].forEach(t=>document.getElementById('cat-tipo-'+t).classList.toggle('active',t===tipo));
+}
+
+function salvarCategoria(){
+  const nome=document.getElementById('cat-nome').value.trim();
+  if(!nome){ showToast('Informe o nome da categoria'); return; }
+  // Somente Pro pode criar categorias customizadas
+  if(!editCatId){
+    const lim = checarLimite('categoria');
+    if(!lim.ok){ closeAllDrawers(); showUpgradeModal(lim.msg); return; }
+  }
+  const cat={id:editCatId||uid(),nome,icone:emojiSel,cor:colorSel,tipo:catTipo};
+  if(editCatId){
+    const idx=DB.categorias.findIndex(c=>c.id===editCatId);
+    if(idx>=0) DB.categorias[idx]=cat;
+  } else {
+    DB.categorias.push(cat);
+  }
+  dbSave(); closeAllDrawers();
+  showToast('Categoria salva ✓');
+  renderCfgCats();
+}
+
+function renderCfgCats(){
+  document.getElementById('cats-list-cfg').innerHTML=DB.categorias.map(c=>`
+    <div class="cat-item">
+      <div class="cat-ico-wrap" style="background:${c.cor}22">${c.icone}</div>
+      <div class="cat-name">${c.nome}</div>
+      <span class="cat-type ${c.tipo}">${c.tipo==='desp'?'Saída':c.tipo==='rec'?'Entrada':'Ambos'}</span>
+      <button class="cat-edit" onclick="editCat('${c.id}')">✎</button>
+    </div>`).join('');
+}
+
+function editCat(id){
+  const cat=DB.categorias.find(c=>c.id===id);
+  if(!cat) return;
+  editCatId=id;
+  openDrawer('drawer-cat');
+  document.getElementById('drawer-cat-title').textContent='Editar categoria';
+  document.getElementById('cat-nome').value=cat.nome;
+  document.getElementById('cat-edit-id').value=id;
+  emojiSel=cat.icone; colorSel=cat.cor; catTipo=cat.tipo;
+  renderEmojiGrid(); renderColorGrid(); selCatTipo(cat.tipo);
+}
+
+// ── CONFIGURAÇÕES ─────────────────────────────────────────────────────────────
+function renderCfgPerfil(){
+  if(!DB.user) return;
+  document.getElementById('cfg-nome-label').textContent=DB.user.nome||'—';
+  const perfis={pessoal:'Uso pessoal',mei:'MEI / Autônomo',empresa:'Empresa'};
+  document.getElementById('cfg-perfil-label').textContent=perfis[DB.user.perfil]||'—';
+  // Atualizar labels conforme plano
+  const csvLabel = document.getElementById('csv-label');
+  if(csvLabel) csvLabel.textContent = isPro() ? 'Exportar CSV' : '🔒 Exportar CSV';
+  const catBtn = document.querySelector('.btn-ghost');
+  if(catBtn && catBtn.textContent.includes('categoria')){
+    catBtn.textContent = isPro() ? '+ Nova categoria' : '🔒 Nova categoria';
+  }
+}
+
+function togglePriv(btn){
+  btn.classList.toggle('on');
+  privMode=btn.classList.contains('on');
+  DB.settings.privacidade=privMode;
+  dbSave();
+  if(currentTab==='inicio') renderInicio();
+  if(currentTab==='lanc')   renderLanc();
+}
+
+// ── BACKUP JSON ───────────────────────────────────────────────────────────────
+function exportarBackup(){
+  // Serializar DB completo com metadados
+  const backup = {
+    _finia_backup: true,
+    _versao: '1.0',
+    _exportadoEm: new Date().toISOString(),
+    _dispositivo: navigator.userAgent.slice(0,60),
+    ...DB
+  };
+  const json = JSON.stringify(backup, null, 2);
+  const nome = DB.user?.nome
+    ? DB.user.nome.toLowerCase().replace(/\s+/g,'-')
+    : 'meus-dados';
+  const data = new Date().toISOString().slice(0,10);
+  const blob = new Blob([json], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `finia-backup-${nome}-${data}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Backup salvo com sucesso ✓');
+}
+
+function importarBackup(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  // Resetar input para permitir importar o mesmo arquivo novamente
+  event.target.value = '';
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const dados = JSON.parse(e.target.result);
+
+      // Validar que é um backup do Finia
+      if(!dados._finia_backup){
+        mostrarErroImport('Arquivo inválido. Selecione um backup exportado pelo Finia.');
+        return;
+      }
+
+      // Confirmar antes de sobrescrever
+      const totalLancs = Object.values(dados.lancamentos||{}).reduce((s,m)=>s+m.length,0);
+      const meses      = Object.keys(dados.lancamentos||{}).length;
+      const exportadoEm = dados._exportadoEm
+        ? new Date(dados._exportadoEm).toLocaleDateString('pt-BR')
+        : 'data desconhecida';
+
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+      modal.innerHTML = `
+        <div style="background:#1e293b;border-radius:24px 24px 0 0;padding:28px 24px 40px;width:100%;max-width:430px;border-top:1px solid #334155">
+          <div style="width:36px;height:4px;background:#334155;border-radius:2px;margin:0 auto 20px"></div>
+          <div style="font-size:20px;margin-bottom:12px">📦</div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Restaurar backup?</div>
+
+          <!-- Resumo do backup -->
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:14px;margin-bottom:16px">
+            <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Conteúdo do backup</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:12px;color:#94a3b8">👤 Nome</span>
+                <span style="font-size:12px;font-weight:600;color:#f1f5f9">${dados.user?.nome||'—'}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:12px;color:#94a3b8">📅 Exportado em</span>
+                <span style="font-size:12px;font-weight:600;color:#f1f5f9">${exportadoEm}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:12px;color:#94a3b8">💰 Lançamentos</span>
+                <span style="font-size:12px;font-weight:600;color:#22d3a5">${totalLancs}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:12px;color:#94a3b8">📆 Meses</span>
+                <span style="font-size:12px;font-weight:600;color:#f1f5f9">${meses}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:12px;color:#94a3b8">🏷️ Categorias</span>
+                <span style="font-size:12px;font-weight:600;color:#f1f5f9">${(dados.categorias||[]).length}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:12px;padding:12px;margin-bottom:16px;font-size:12px;color:#fbbf24;line-height:1.5">
+            ⚠️ Os dados atuais deste dispositivo serão substituídos pelos dados do backup.
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button onclick="confirmarImportBackup()"
+              style="padding:15px;border-radius:14px;border:none;background:var(--gr);color:#0f172a;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">
+              ✓ Restaurar backup
+            </button>
+            <button onclick="window._backupPendente=null;this.closest('div[style]').remove()"
+              style="padding:12px;border-radius:14px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+              Cancelar
+            </button>
+          </div>
+        </div>`;
+      modal.onclick = (ev) => { if(ev.target===modal) modal.remove(); };
+      document.body.appendChild(modal);
+      // Guardar dados para uso no confirmar
+      window._backupPendente = dados;
+
+    } catch(err) {
+      mostrarErroImport('Arquivo corrompido ou inválido. Tente exportar um novo backup.');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function confirmarImportBackup(){
+  const dados = window._backupPendente;
+  if(!dados){ showToast('Erro: backup perdido, tente novamente.'); return; }
+  // Fechar modal
+  document.querySelectorAll('div[style*="fixed"]').forEach(el=>{
+    if(el.style.zIndex==='9999') el.remove();
+  });
+  // Restaurar dados preservando campos internos
+  DB.user        = dados.user        || DB.user;
+  DB.categorias  = dados.categorias  || DB.categorias;
+  DB.lancamentos = dados.lancamentos || {};
+  DB.settings    = dados.settings    || {privacidade:false};
+  DB.pro         = dados.pro         || {ativo:false};
+  DB.uso         = dados.uso         || {importacoesMes:{},lancamentosMes:{}};
+  dbSave();
+  window._backupPendente = null;
+  showToast('Backup restaurado com sucesso ✓');
+  // Recarregar o app com os dados novos
+  setTimeout(()=>{ currentMes=mesAtual(); navTo('inicio', document.getElementById('bnav-inicio')); renderBadgePro(); renderCfgPerfil(); renderCfgCats(); }, 300);
+}
+
+function mostrarErroImport(msg){
+  const m = document.createElement('div');
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  m.innerHTML=`
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center">
+      <div style="font-size:36px;margin-bottom:12px">❌</div>
+      <div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Não foi possível restaurar</div>
+      <div style="font-size:13px;color:#64748b;line-height:1.6;margin-bottom:20px">${msg}</div>
+      <button onclick="this.closest('div[style]').remove()" style="width:100%;padding:13px;border-radius:12px;border:none;background:#334155;color:#f1f5f9;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Ok</button>
+    </div>`;
+  m.onclick=(e)=>{if(e.target===m)m.remove();};
+  document.body.appendChild(m);
+}
+
+function exportarCSV(){
+  const lim = checarLimite('csv');
+  if(!lim.ok){ showUpgradeModal(lim.msg); return; }
+  const rows=[['Data','Descrição','Valor','Tipo','Categoria','Parcela','Nota']];
+  Object.entries(DB.lancamentos).forEach(([ym,lancs])=>{
+    lancs.forEach(l=>{
+      const cat=DB.categorias.find(c=>c.id===l.catId)||{nome:'Outros'};
+      const parc=l.parcTotal>1?`${l.parcAtual}/${l.parcTotal}`:'';
+      rows.push([l.data,`"${l.desc}"`,l.valor.toFixed(2).replace('.',','),
+        l.tipo==='rec'?'Entrada':'Saída',cat.nome,parc,`"${l.nota||''}"`]);
+    });
+  });
+  const csv=rows.map(r=>r.join(';')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download=`finia_${DB.user?.nome||'dados'}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  showToast('CSV exportado ✓');
+}
+
+function limparDados(){
+  // Usar modal próprio pois confirm() pode ser bloqueado em alguns browsers/webviews
+  const modal = document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.innerHTML=`
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center">
+      <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#f1f5f9">Apagar todos os dados?</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6">Todos os lançamentos, categorias e configurações serão removidos. Essa ação não pode ser desfeita.</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="storage.clear();location.reload()" style="padding:14px;border-radius:12px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">Sim, apagar tudo</button>
+        <button onclick="this.closest('[style]').remove()" style="padding:12px;border-radius:12px;border:1.5px solid #334155;background:transparent;color:#94a3b8;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// ── RELATÓRIOS ────────────────────────────────────────────────────────────────
+function setPeriod(mode,btn){
+  if(mode!=='mes'){
+    const lim = checarLimite('relatorio_periodo');
+    if(!lim.ok){ showUpgradeModal(lim.msg); return; }
+  }
+  periodMode=mode;
+  document.querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRel();
+}
+
+function getMeses(mode){
+  const all=Object.keys(DB.lancamentos).sort();
+  if(!all.length) return [currentMes];
+  if(mode==='mes') return [currentMes];
+  if(mode==='trim'){
+    const [y,m]=currentMes.split('-').map(Number);
+    return [0,1,2].map(i=>{
+      const d=new Date(y,m-1-i,1);
+      return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    }).filter(ym=>DB.lancamentos[ym]);
+  }
+  if(mode==='ano'){
+    const ano=currentMes.split('-')[0];
+    return all.filter(ym=>ym.startsWith(ano));
+  }
+  return [currentMes];
+}
+
+function renderRel(){
+  const meses=getMeses(periodMode);
+  const allLancs=meses.flatMap(ym=>getLancs(ym));
+  const totalRec=allLancs.filter(l=>l.tipo==='rec').reduce((s,l)=>s+l.valor,0);
+  const totalDesp=allLancs.filter(l=>l.tipo==='desp').reduce((s,l)=>s+l.valor,0);
+  const saldoTotal=totalRec-totalDesp;
+  const txEcon=totalRec>0?Math.max(0,(saldoTotal/totalRec)*100):0;
+
+  // Parcelamentos ativos
+  const parcelados=allLancs.filter(l=>l.parcTotal>1&&l.tipo==='desp');
+  const totalRestante=parcelados.reduce((s,l)=>s+(l.valor*(l.parcTotal-l.parcAtual+1)),0);
+
+  // Gastos por categoria
+  const catMap={};
+  allLancs.filter(l=>l.tipo==='desp').forEach(l=>{ catMap[l.catId]=(catMap[l.catId]||0)+l.valor; });
+  const sortedCats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+
+  // Insights automáticos
+  const insights=gerarInsights(allLancs,totalRec,totalDesp,saldoTotal,txEcon,parcelados);
+
+  const periodoLabel=periodMode==='mes'?mesLabel(currentMes):periodMode==='trim'?'Últimos 3 meses':'Ano '+currentMes.split('-')[0];
+
+  document.getElementById('rel-content').innerHTML=`
+    <div class="section-title">${periodoLabel} · ${meses.length} ${meses.length===1?'mês':'meses'}</div>
+
+    <!-- Resumo financeiro -->
+    <div class="card">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Entradas</div>
+          <div style="font-size:20px;font-weight:700;font-family:'DM Mono',monospace;color:var(--gr)">${fmtV(totalRec)}</div></div>
+        <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Saídas</div>
+          <div style="font-size:20px;font-weight:700;font-family:'DM Mono',monospace;color:var(--rd)">${fmtV(totalDesp)}</div></div>
+      </div>
+      <div style="border-top:1px solid var(--bd);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Saldo</div>
+          <div style="font-size:22px;font-weight:800;font-family:'DM Mono',monospace;color:${saldoTotal>=0?'var(--gr)':'var(--rd)'}">${fmtV(saldoTotal)}</div></div>
+        <div style="text-align:right"><div style="font-size:10px;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Taxa de economia</div>
+          <div style="font-size:22px;font-weight:800;font-family:'DM Mono',monospace;color:${txEcon>=20?'var(--gr)':'var(--am)'}">${txEcon.toFixed(0)}%</div></div>
+      </div>
+    </div>
+
+    ${parcelados.length?`
+    <!-- Parcelamentos -->
+    <div class="section-title" style="margin-top:4px">⚠️ Parcelamentos ativos</div>
+    <div class="divida-alert">
+      <div style="font-size:11px;color:var(--mu);font-weight:600">Total ainda a pagar</div>
+      <div class="divida-total">${fmtV(totalRestante)}</div>
+      <div style="font-size:11px;color:var(--ts)">${parcelados.length} compra${parcelados.length>1?'s':''} parcelada${parcelados.length>1?'s':''} em aberto</div>
+    </div>
+    ${parcelados.slice(0,5).map(l=>{
+      const cat=DB.categorias.find(c=>c.id===l.catId)||{icone:'💸',nome:'Outros'};
+      const pct=((l.parcAtual-1)/l.parcTotal*100).toFixed(0);
+      const restante=l.valor*(l.parcTotal-l.parcAtual+1);
+      return `<div class="parc-item">
+        <div class="parc-header">
+          <div><div class="parc-name">${cat.icone} ${l.desc}</div><div style="font-size:11px;color:var(--mu);margin-top:2px">${fmtVRaw(l.valor)}/mês</div></div>
+          <div class="parc-badge">${l.parcAtual}/${l.parcTotal}</div>
+        </div>
+        <div class="parc-progress"><div class="parc-progress-fill" style="width:${pct}%"></div></div>
+        <div class="parc-footer">
+          <div class="parc-info">Restam <strong>${l.parcTotal-l.parcAtual+1} parcelas</strong></div>
+          <div class="parc-info">Total: <strong>${fmtVRaw(restante)}</strong></div>
+        </div>
+      </div>`;
+    }).join('')}`:''}
+
+    <!-- Gastos por categoria -->
+    ${sortedCats.length?`
+    <div class="section-title" style="margin-top:4px">Gastos por categoria</div>
+    <div class="card"><div class="bar-chart">
+      ${sortedCats.map(([cid,val])=>{
+        const cat=DB.categorias.find(c=>c.id===cid)||{icone:'💸',nome:'Outros',cor:'#64748b'};
+        const pct=(val/totalDesp*100).toFixed(0);
+        const pctBar=(val/(sortedCats[0][1])*100).toFixed(0);
+        return `<div class="bar-item">
+          <div class="bar-header">
+            <div class="bar-label">${cat.icone} ${cat.nome}</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="font-size:10px;color:var(--mu)">${pct}%</div>
+              <div class="bar-val">${fmtV(val)}</div>
+            </div>
+          </div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pctBar}%;background:${cat.cor}"></div></div>
+        </div>`;
+      }).join('')}
+    </div></div>`:''}
+
+    <!-- Insights -->
+    ${insights.length?`
+    <div class="section-title" style="margin-top:4px">💡 Análise inteligente</div>
+    ${insights.map(i=>`<div class="insight-card">
+      <div class="insight-icon">${i.icone}</div>
+      <div class="insight-title">${i.titulo}</div>
+      <div class="insight-text">${i.texto}</div>
+    </div>`).join('')}`:''}
+  `;
+}
+
+function gerarInsights(lancs,rec,desp,sal,txEcon,parcelados){
+  const insights=[];
+  if(txEcon<10&&rec>0) insights.push({icone:'⚠️',titulo:'Taxa de economia baixa',
+    texto:`Você economizou apenas <strong>${txEcon.toFixed(0)}%</strong> da sua renda neste período. O ideal é guardar pelo menos 20%. Revise seus gastos maiores.`});
+  if(txEcon>=20) insights.push({icone:'🏆',titulo:'Ótima economia!',
+    texto:`Você guardou <strong>${txEcon.toFixed(0)}%</strong> da sua renda. Considere investir o excedente em renda fixa ou CDB para fazer esse dinheiro crescer.`});
+  if(parcelados.length>=3) insights.push({icone:'📦',titulo:'Muitos parcelamentos ativos',
+    texto:`Você tem <strong>${parcelados.length} compras parceladas</strong> em aberto. Isso compromete sua renda futura. Evite novas parcelas até quitar as atuais.`});
+  const catMap={};
+  lancs.filter(l=>l.tipo==='desp').forEach(l=>{ catMap[l.catId]=(catMap[l.catId]||0)+l.valor; });
+  const top=Object.entries(catMap).sort((a,b)=>b[1]-a[1])[0];
+  if(top&&desp>0){
+    const cat=DB.categorias.find(c=>c.id===top[0]);
+    const pct=(top[1]/desp*100).toFixed(0);
+    if(pct>40) insights.push({icone:'🔍',titulo:`${cat?.nome||'Uma categoria'} concentra ${pct}% dos gastos`,
+      texto:`Quase metade das suas saídas foi em <strong>${cat?.nome||'uma categoria'}</strong>. Vale analisar se dá para reduzir.`});
+  }
+  if(sal<0) insights.push({icone:'🚨',titulo:'Gastos maiores que a renda',
+    texto:`Você gastou <strong>${fmtVRaw(Math.abs(sal))}</strong> a mais do que recebeu. Isso indica que usou reservas ou crédito. Atenção redobrada no próximo mês.`});
+  return insights;
+}
+
+// ── IMPORTADOR ───────────────────────────────────────────────────────────────
+// (impTipo e parsedItems declarados nas variáveis globais acima)
+
+function initImpMes(){
+  const sel = document.getElementById('iMesRef');
+  if(!sel) return;
+  sel.innerHTML='';
+  const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const [y,m] = currentMes.split('-').map(Number);
+  for(let i=-6;i<=3;i++){
+    const d = new Date(y,m-1+i,1);
+    const ym = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const label = meses[d.getMonth()]+'/'+d.getFullYear();
+    const o = document.createElement('option');
+    o.value=ym; o.textContent=label;
+    if(ym===currentMes) o.selected=true;
+    sel.appendChild(o);
+  }
+}
+
+function selImpTipo(tipo){
+  impTipo = tipo;
+  // Cards
+  document.getElementById('iBtn_extrato').classList.toggle('active', tipo==='extrato');
+  document.getElementById('iBtn_fatura').classList.toggle('active', tipo==='fatura');
+  document.getElementById('iCheck_extrato').style.opacity = tipo==='extrato'?'1':'0';
+  document.getElementById('iCheck_fatura').style.opacity  = tipo==='fatura' ?'1':'0';
+  // Mostrar/ocultar opções de cartão
+  document.getElementById('iCartaoWrap').style.display = tipo==='fatura' ? '' : 'none';
+  // Atualizar placeholder da textarea
+  const ta = document.getElementById('iTextoRaw');
+  if(tipo==='extrato'){
+    ta.placeholder='Cole o texto do extrato bancário (PDF copiado)...\n\nO Finia reconhece automaticamente Itaú, Nubank, Bradesco, Inter, BB, Caixa e C6.';
+  } else {
+    ta.placeholder='Cole o texto da fatura do cartão (PDF copiado)...\n\nO Finia reconhece automaticamente Latam Pass, Nubank, Inter, Bradesco e Santander.';
+  }
+}
+
+function getCartaoFiltro(){
+  const r = document.querySelector('input[name="cartaoFiltro"]:checked');
+  return r ? r.value : 'todos';
+}
+
+// ── DRAG & DROP ───────────────────────────────────────────────────────────────
+function handleDragOver(e){ e.preventDefault(); document.getElementById('iDropZone').classList.add('drag'); }
+function handleDragLeave(){ document.getElementById('iDropZone').classList.remove('drag'); }
+function handleDrop(e){ e.preventDefault(); handleDragLeave(); processFile(e.dataTransfer.files[0]); }
+function handleFileInput(e){ processFile(e.target.files[0]); }
+
+function processFile(file){
+  if(!file) return;
+  if(file.name.endsWith('.pdf')||file.type==='application/pdf'){
+    extractPdf(file);
+  } else {
+    const r = new FileReader();
+    r.onload = ev => { document.getElementById('iTextoRaw').value=ev.target.result; rodarParser(); };
+    r.readAsText(file,'utf-8');
+  }
+}
+
+function extractPdf(file){
+  const zone = document.getElementById('iDropZone');
+  zone.innerHTML = '<div class="drop-zone-icon" style="animation:pulse 1s infinite">⏳</div><div class="drop-zone-title">Lendo PDF...</div><div class="drop-zone-sub">Isso pode levar alguns segundos</div>';
+  const load = () => {
+    if(typeof pdfjsLib!=='undefined'){ doExtract(file); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; doExtract(file); };
+    s.onerror = () => {
+      zone.innerHTML='<div class="drop-zone-icon">🌐</div><div class="drop-zone-title">Sem conexão para carregar leitor de PDF</div><div class="drop-zone-sub">Abra o PDF, selecione tudo (Ctrl+A), copie e cole na caixa de texto abaixo</div><input type="file" id="iFileInput" accept=".pdf,.txt" style="display:none" onchange="handleFileInput(event)">';
+    };
+    document.head.appendChild(s);
+  };
+  load();
+}
+
+async function doExtract(file){
+  const zone = document.getElementById('iDropZone');
+  try {
+    const ab  = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:ab}).promise;
+    let txt   = '';
+
+    for(let p=1; p<=pdf.numPages; p++){
+      const page    = await pdf.getPage(p);
+      const content = await page.getTextContent();
+
+      // Agrupar itens por linha (Y arredondado com tolerância de 2px)
+      const byY = {};
+      content.items.forEach(item=>{
+        if(!item.str) return;
+        const y = Math.round(item.transform[5] / 2) * 2; // tolerância 2px
+        if(!byY[y]) byY[y] = [];
+        byY[y].push({
+          x:   item.transform[4],
+          str: item.str,
+          w:   item.width || 0
+        });
+      });
+
+      // Para cada linha, reconstruir texto agrupando por proximidade X
+      // Isso corrige PDFs com fonte espaçada (ex: Santander) onde cada
+      // caractere chega individualmente com posição própria
+      Object.keys(byY).sort((a,b)=>b-a).forEach(y=>{
+        const itens = byY[y].sort((a,b)=>a.x-b.x);
+        if(!itens.length) return;
+
+        let linha = '';
+        let prevEndX = null;
+
+        itens.forEach(item=>{
+          const s = item.str;
+          if(!s) return;
+          const startX = item.x;
+          const endX   = startX + (item.w || s.length * 6);
+
+          if(prevEndX === null){
+            linha += s;
+          } else {
+            const gap = startX - prevEndX;
+            if(gap > 20){
+              linha += '  ' + s;   // gap grande = separador de coluna
+            } else if(gap > 3){
+              linha += ' ' + s;    // gap médio = espaço entre palavras
+            } else {
+              linha += s;           // gap pequeno/zero = mesma palavra
+            }
+          }
+          prevEndX = endX;
+        });
+
+        const l = linha.trim();
+        if(l) txt += l + '\n';
+      });
+    }
+
+    document.getElementById('iTextoRaw').value = txt;
+    zone.innerHTML = `<div class="drop-zone-icon">✅</div><div class="drop-zone-title">${file.name}</div><div class="drop-zone-sub" style="color:var(--gr)">${pdf.numPages} página(s) lida(s) · <span style="color:var(--bl);cursor:pointer" onclick="document.getElementById('iFileInput').click()">trocar arquivo</span></div><input type="file" id="iFileInput" accept=".pdf,.txt" style="display:none" onchange="handleFileInput(event)">`;
+    rodarParser();
+  } catch(err){
+    zone.innerHTML = `<div class="drop-zone-icon">❌</div><div class="drop-zone-title">Não foi possível ler o PDF</div><div class="drop-zone-sub">${err.message}<br><span style="color:var(--bl)">Copie o texto manualmente e cole abaixo</span></div><input type="file" id="iFileInput" accept=".pdf,.txt" style="display:none" onchange="handleFileInput(event)">`;
+  }
+}
+
+// ── PARSER PRINCIPAL ──────────────────────────────────────────────────────────
+// ── PARSER INTELIGENTE COM IA ─────────────────────────────────────────────────
+
+
+function rodarParser(){
+  const txt = document.getElementById('iTextoRaw').value.trim();
+  if(!txt){ showToast('Cole o texto do extrato ou fatura primeiro 📋'); return; }
+
+  // Resetar saldo detectado
+  window._saldoDetectado = null;
+
+  // Detectar banco antes de parsear (para debug)
+  let bancoDetectado = 'Genérico';
+  if(impTipo==='extrato'){
+    if(/santander|extrato consolidado inteligente/i.test(txt.slice(0,500))) bancoDetectado='Santander';
+    else if(/ita[úu]|saldo do dia/i.test(txt.slice(0,500))) bancoDetectado='Itaú';
+    else if(/nubank/i.test(txt.slice(0,500))) bancoDetectado='Nubank';
+    else if(/inter/i.test(txt.slice(0,500))) bancoDetectado='Inter';
+    else if(/bradesco/i.test(txt.slice(0,500))) bancoDetectado='Bradesco';
+    else if(/banco do brasil/i.test(txt.slice(0,500))) bancoDetectado='BB';
+  }
+
+  parsedItems = impTipo==='extrato' ? parsearExtrato(txt) : parsearFatura(txt);
+
+  if(!parsedItems.length){
+    // Mostrar modal com texto extraído para diagnóstico
+        const linhas = txt.split(/[\n\r]+/).filter(l=>l.trim()).length;
+    const modal = document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+    modal.innerHTML=`
+      <div style="background:#1e293b;border-radius:24px 24px 0 0;padding:24px 20px 40px;width:100%;max-width:430px;max-height:80vh;display:flex;flex-direction:column">
+        <div style="width:36px;height:4px;background:#334155;border-radius:2px;margin:0 auto 16px;flex-shrink:0"></div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px;flex-shrink:0">⚠️ Nenhum lançamento detectado</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:14px;flex-shrink:0;line-height:1.6">
+          Banco detectado: <strong style="color:#a78bfa">${bancoDetectado}</strong> · ${linhas} linhas extraídas.<br>
+          Veja o texto abaixo e envie uma foto para o suporte se o problema persistir.
+        </div>
+        <div style="flex:1;overflow-y:auto;background:#0f172a;border-radius:10px;padding:12px;margin-bottom:14px">
+          <pre style="font-family:'DM Mono',monospace;font-size:10px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;margin:0">${txt.slice(0,2000)}${txt.length>2000?'\n... (truncado)':''}</pre>
+        </div>
+        <button onclick="this.closest('div[style*=fixed]').remove()"
+          style="width:100%;padding:13px;border-radius:12px;border:none;background:#334155;color:#f1f5f9;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;flex-shrink:0">
+          Fechar
+        </button>
+      </div>`;
+    modal.onclick=(e)=>{if(e.target===modal)modal.remove();};
+    document.body.appendChild(modal);
+    return;
+  }
+  resultFiltro = 'todos';
+  mostrarStep2();
+}
+
+function verTextoExtraido(){
+  const txt = document.getElementById('iTextoRaw').value.trim();
+  if(!txt){ showToast('Nenhum texto para exibir. Importe um arquivo primeiro.'); return; }
+  const linhas = txt.split(/[\n\r]+/)
+  const modal = document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML=`
+    <div style="background:#1e293b;border-radius:24px 24px 0 0;padding:24px 20px 40px;width:100%;max-width:430px;max-height:80vh;display:flex;flex-direction:column">
+      <div style="width:36px;height:4px;background:#334155;border-radius:2px;margin:0 auto 16px;flex-shrink:0"></div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px;flex-shrink:0">🔍 Texto extraído do PDF</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:14px;flex-shrink:0">
+        ${linhas.length} linhas · Banco: <strong>${
+          /santander|extrato consolidado/i.test(txt.slice(0,500)) ? 'Santander' :
+          /ita[úu]|saldo do dia/i.test(txt.slice(0,500)) ? 'Itaú' :
+          /nubank/i.test(txt.slice(0,500)) ? 'Nubank' : 'Não identificado'
+        }</strong>
+      </div>
+      <div style="flex:1;overflow-y:auto;background:#0f172a;border-radius:10px;padding:12px;margin-bottom:14px">
+        <pre style="font-family:'DM Mono',monospace;font-size:10px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;margin:0">${linhas.slice(0,100).map((l,i)=>`${String(i+1).padStart(3,' ')}: ${l}`).join('\n')}</pre>
+      </div>
+      <button onclick="this.closest('div[style*=fixed]').remove()"
+        style="width:100%;padding:13px;border-radius:12px;border:none;background:#334155;color:#f1f5f9;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;flex-shrink:0">
+        Fechar
+      </button>
+    </div>`;
+  modal.onclick=(e)=>{if(e.target===modal)modal.remove();};
+  document.body.appendChild(modal);
+}
+
+function mostrarStep2(){
+  document.getElementById('imp-step1').style.display = 'none';
+  document.getElementById('imp-step2').style.display = '';
+  renderImpResult();
+}
+
+function impVoltarStep1(){
+  document.getElementById('imp-step2').style.display = 'none';
+  document.getElementById('imp-step1').style.display = '';
+}
+
+// ── PARSER EXTRATO BANCÁRIO ─────────────────────────────────────────────────
+// Suporta: Itaú, Santander, Nubank, Bradesco, Inter, BB, Caixa, C6
+function parsearExtrato(txt){
+  const linhas = txt.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
+  const items  = [];
+
+  // Detectar banco pelo conteúdo
+  // Santander: detectar mesmo com letras espaçadas ("S antander", "SANT ANDER", etc.)
+  const txtNorm = txt.replace(/\s+/g,' ').toLowerCase();
+  const isSantander = /s\s*a\s*n\s*t\s*a\s*n\s*d\s*e\s*r|extrato\s+consolidado\s+inteligente|movi\s*m\s*enta\s*[çc]/i.test(txt.slice(0,800));
+
+  if(isSantander) return parsearExtratoSantander(linhas);
+
+  // Stone / Conecta Brasil
+  const isStone = /stone\s+institu|conecta\s+brasil|data\s+tipo\s+descri/i.test(txt.slice(0,1000));
+  if(isStone) return parsearExtratoStone(linhas);
+
+  // ── Parser genérico (Itaú, Nubank, Inter, BB, Caixa, C6) ─────────────────
+
+  // Tentar detectar o ano do extrato no cabeçalho
+  let anoExtrato = currentMes.split('-')[0];
+  for(const l of linhas.slice(0,20)){
+    const mAno = l.match(/(\d{4})/);
+    if(mAno && parseInt(mAno[1]) >= 2020 && parseInt(mAno[1]) <= 2030){
+      anoExtrato = mAno[1]; break;
+    }
+  }
+
+  // Linhas a ignorar
+  const ignorar = [
+    /saldo/i,
+    /^(data|histórico|descrição|agência|agencia|conta|extrato|período|periodo|banco|cpf|cnpj|cliente|endereço|moeda)/i,
+    /^(total|subtotal|resumo|limite|disponível)/i,
+    /rend\s+pago/i,
+    /rendimento\s*(pago|creditado|do período)/i,
+    /^iof$/i,
+    /iof\s+cobrado/i,
+    /tarifa\s+(de\s+)?(manutenção|serviço|pacote)/i,
+    /encargo/i,
+    /aplicacao\s+(cofrinhos|automatica|aut)/i,
+    /aplicação\s+(cofrinhos|automática|aut)/i,
+    /aplic\s+aut/i,
+    /cof\s+resgate/i,
+    /resgate\s+cdb/i,
+    /resgate\s+automatico/i,
+    /resgate\s+automático/i,
+    /limite\s+(da\s+conta|disponível|contratado|utilizado|total)/i,
+    /saldo\s+disponível\s+total/i,
+    /cheque\s+especial/i,
+    /adiantamento\s+a\s+depositante/i,
+    /^(-{3,}|={3,}|\*{3,})/,
+    /^(página|page|\d+\s*\/\s*\d+)$/i,
+  ];
+
+  // Padrões Itaú / genérico
+  const padroes = [
+    /^(\d{2}\/\d{2}(?:\/\d{4})?)\s{2,}(.+?)\s{2,}([-−+]?\s*\d{1,3}(?:\.\d{3})*,\d{2})\s*$/,
+    /^(\d{2}\/\d{2}(?:\/\d{4})?)\s+(.+?)\s+([-−+]?\d{1,3}(?:\.\d{3})*,\d{2})\s*$/,
+    /^(\d{2}\/\d{2}(?:\/\d{4})?)\s+(.+?)\s+([-−+])\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/,
+  ];
+
+  for(const l of linhas){
+    if(ignorar.some(re=>re.test(l))) continue;
+    let data='', desc='', valorStr='', sinal=1, matched=false;
+    for(const re of padroes){
+      const m = re.exec(l);
+      if(m){
+        if(re.source.includes('[-−+])\\s*')){
+          data=m[1]; desc=m[2].trim(); sinal=m[3]==='-'||m[3]==='−'?-1:1; valorStr=m[4];
+        } else {
+          data=m[1]; desc=m[2].trim(); valorStr=m[3].replace(/\s/g,'');
+          sinal=(valorStr[0]==='-'||valorStr[0]==='−')?-1:1;
+          valorStr=valorStr.replace(/^[-−+]/,'');
+        }
+        matched=true; break;
+      }
+    }
+    if(!matched) continue;
+    const valor=parseFloat(valorStr.replace(/\./g,'').replace(',','.'));
+    if(isNaN(valor)||valor===0) continue;
+    const tipo=sinal>0?'rec':'desp';
+    const catId=autoCat(desc,tipo);
+    items.push({
+      data:normData(data,anoExtrato), desc:cleanDesc(desc), valor:Math.abs(valor),
+      tipo, catId, parcAtual:1, parcTotal:1, nota:'', _sel:true
+    });
+
+    // Detectar saldo mais recente
+    if(!window._saldoDetectado){
+      const mSaldo = l.match(/^(\d{2}\/\d{2}\/\d{4})\s+SALDO\s+DO\s+DIA\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/i);
+      if(mSaldo){
+        const v=parseFloat(mSaldo[2].replace(/\./g,'').replace(',','.'));
+        const p=mSaldo[1].split('/');
+        window._saldoDetectado={valor:v,data:`${p[2]}-${p[1]}-${p[0]}`,dataLabel:mSaldo[1]};
+      }
+    }
+  }
+  return items;
+}
+
+// ── PARSER ESPECÍFICO SANTANDER ───────────────────────────────────────────────
+function normalizarLinhasSantander(linhas){
+  // PDF Santander: letras/sílabas separadas por espaço simples
+  // Aplica substituições diretas dos padrões mais comuns
+
+  const normLinha = (l) => {
+    // 1. Datas: "12 / 05" → "12/05"
+    l = l.replace(/(\d{1,2})\s*\/\s*(\d{2})(?=\s|$)/g, '$1/$2');
+
+    // 2. Valores monetários
+    l = l.replace(/(\d+)\s*\.\s*(\d{3})\s*,\s*(\d{2})/g, '$1.$2,$3');
+    l = l.replace(/(\d+)\s*,\s*(\d{2})(?!\d)/g, '$1,$2');
+
+    // 3. Padrões espaçados comuns do Santander
+    const fixes = [
+      [/PIX\s+ENVIAD\s*O/gi,               'PIX ENVIADO'],
+      [/PIX\s+RECEBID\s*O/gi,              'PIX RECEBIDO'],
+      [/TAR\s*IFA\s+MEN\s*SALID\s*ADE/gi,  'TARIFA MENSALIDADE'],
+      [/PACOTE\s+SER\s*VICO\s*S/gi,        'PACOTE SERVICOS'],
+      [/LIMITE\s*DA\s*CONTA/gi,            'LIMITE DA CONTA'],
+      [/LIMITEDACONTA/gi,                  'LIMITE DA CONTA'],
+      [/CHE\s*QUE\s+ESPE\s*CIAL/gi,       'CHEQUE ESPECIAL'],
+      [/PAGAME\s*N\s*TO/gi,                'PAGAMENTO'],
+      [/CAR\s*TAO/gi,                      'CARTAO'],
+      [/CRE\s*D\s*ITO/gi,                  'CREDITO'],
+      [/MOV\s*I\s*MEN\s*TA\s*[CÇ][AÃ]O/gi,'MOVIMENTACAO'],
+      [/SAL\s*DO\s+DIS\s*PON/gi,           'SALDO DISPONIVEL'],
+      [/CET\s*\(/gi,                        'CET('],
+      [/S\s+antander/gi,                   'Santander'],
+      [/MOVI\s+M\s+ENTA\s*[CÇ][AÃ]O/gi,   'MOVIMENTACAO'],
+    ];
+    for(const [re, rep] of fixes) l = l.replace(re, rep);
+
+    // 4. Colapsar múltiplos espaços
+    l = l.replace(/\s{3,}/g, '  ');
+    return l.trim();
+  };
+
+  return linhas.map(normLinha).filter(Boolean);
+}
+
+function parsearExtratoSantander(linhas){
+  // Normalizar primeiro
+  linhas = normalizarLinhasSantander(linhas);
+
+  const items = [];
+
+  // No Santander: valores negativos terminam com "-" (250,00-)
+  // Formato: Data  Descrição  [nº doc]  Movimento  Saldo
+  // A data às vezes está na mesma linha do valor, às vezes não.
+  // Estratégia: acumular linhas até encontrar uma linha de valor.
+
+  // Data pode vir como "12/05" ou ainda com espaços residuais "12/ 05"
+  const reDataInicio  = /^(\d{2}\/\s*\d{2})\s+(.+)$/;
+  // Linha de valores: "- 250,00- 234,48-" ou "- 500,00" ou "171044 234,84- 30,68"
+  // Também aceita sem o "-" inicial: "500,00" ou "300,00 63,83"
+  const reSoValores   = /^(?:[-\s]*|[\d]+\s+)(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s*(\d{1,3}(?:\.\d{3})*,\d{2})?([-]?)\s*$/;
+  const reSaldo       = /^(?:saldo\s+em|saldo\s+de\s+conta|saldo\s+em\s+\d)/i;
+  // Padrão para ignorar linhas que são metadados do Santander (após normalização)
+  const reIgnorar = /^(data$|descrição$|nº documento|movimento|saldo \(r|agência|conta corrente|nome$|pagina|loja:|central de|ouvidoria|^sac$|chat$|libras|confira|workcaf|vivencie|reserva de salas|benefícios nas|para saber mais|transações excedentes|cheques|fornecimento|valor da mensalidade|status do déb|dia de déb|produto\s+núm|cet\s*\(|custo efetivo|limite|cheque especial|créditos contrat|investimentos$|perfil de risco|balancea|saldos por período|efetivado$|padronizado|movimentac|transf entre|extrato term|extrato mes|simulac|pagamento min|parcelas fix|valor total|saldo devedor|saldo disponível)/i;
+
+  let dataCurrent = '';
+  let descLines   = [];
+  let anoExtrato  = currentMes.split('-')[0];
+
+  // Extrair o ano do período do extrato
+  for(const l of linhas.slice(0,10)){
+    const mAno = l.match(/(\d{4})/);
+    if(mAno && parseInt(mAno[1])>=2020){ anoExtrato=mAno[1]; break; }
+  }
+
+  const commitItem = (desc, valorStr, neg) => {
+    if(!dataCurrent || !desc.trim() || !valorStr) return;
+    // Normalizar desc para comparação (remover espaços extras entre letras)
+    const descNorm = desc.replace(/\s+/g,' ').trim().toUpperCase();
+    // Ignorar tarifas, limites, encargos e metadados bancários
+    if(/TARIFA|MENSALIDADE|PACOTE\s*SERV|LIMITE|CHEQUE\s*ESPECIAL|ADIANTAMENTO|PROVID|ENCARGO|JUROS\s*MORA|MULTA|CET\s*\(|CUSTO\s*EFETIVO|LIMITE\s*DA\s*CONTA|LIMITEDACONTA|SALDO\s*DISPONIVEL|SALDO\s*DEVEDOR|VALOR\s*TOTAL|SIMULACAO|PAGAMENTO\s*MINIMO|PARCELAS\s*FIXAS/.test(descNorm)) return;
+    const vLimpo = valorStr.replace(/[^0-9,.]/g,'').replace(/\./g,'').replace(',','.');
+    const valor  = parseFloat(vLimpo);
+    if(isNaN(valor) || valor <= 0) return;
+    const tipo    = neg ? 'desp' : 'rec';
+    const dataFull = normData(dataCurrent, anoExtrato);
+    items.push({
+      data:dataFull, desc:cleanDesc(desc.replace(/\s+/g,' ').trim()),
+      valor, tipo, catId:autoCat(desc,tipo),
+      parcAtual:1, parcTotal:1, nota:'Santander', _sel:true
+    });
+  };
+
+  // Regex para extrair movimento de linhas com e sem data
+  // Formato Santander: DATA  DESC  -  MOVIMENTO(sinal)  SALDO(sinal)
+  // O sinal está COLADO ao fim do número: 250,00- = saída, 500,00 = entrada
+  // O "-" antes do valor = campo nº documento vazio (ignorar para determinar sinal)
+
+  // Linha com data + doc vazio + 2 valores: "DD/MM DESC - MOV(sinal) SALDO(sinal)"
+  const reFull2 = /^(\d{2}\/\d{2})\s+(.+?)\s+-\s+(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s+\d/;
+  // Linha com data + doc vazio + 1 valor: "DD/MM DESC - MOV(sinal)"
+  const reFull1 = /^(\d{2}\/\d{2})\s+(.+?)\s+-\s+(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s*$/;
+  // Linha SEM data com desc + valores: "DESC - MOV(sinal) SALDO" ou "DESC NUM MOV(sinal) SALDO"
+  const reSemData2 = /^(.+?)\s+-\s+(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s+\d/;
+  const reSemData1 = /^(.+?)\s+-\s+(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s*$/;
+  // Linha de nº doc + 2 valores: "171044 234,84- 30,68"
+  const reDocVal   = /^[\w*]+\s+(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s*$/;
+  // Linha de valores puros: "- 500,00" ou "500,00 63,83"
+  const reValPuro  = /^[-\s]*(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s*(?:\d[\d.,]*)?\s*$/;
+
+  for(let i=0; i<linhas.length; i++){
+    const l = linhas[i];
+    if(!l || l.length < 2) continue;
+    if(reIgnorar.test(l)) continue;
+    if(reSaldo.test(l)) continue;
+    if(/^\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(l)) continue; // horário
+
+    // ── Linhas COM data ──────────────────────────────────────────────────────
+
+    // "DD/MM DESC - MOV- SALDO" (com 2 valores)
+    let m = reFull2.exec(l);
+    if(m){ dataCurrent=m[1]; commitItem(m[2].trim(),m[3],m[4]==='-'); descLines=[]; continue; }
+
+    // "DD/MM DESC - MOV-" (com 1 valor)
+    m = reFull1.exec(l);
+    if(m){ dataCurrent=m[1]; commitItem(m[2].trim(),m[3],m[4]==='-'); descLines=[]; continue; }
+
+    // Data + resto (sem valor ainda — acumular desc)
+    if(/^\d{2}\/\d{2}\s/.test(l)){
+      const mD = /^(\d{2}\/\d{2})\s+(.+)$/.exec(l);
+      if(mD){ dataCurrent=mD[1]; descLines=[mD[2]]; continue; }
+    }
+
+    // ── Linhas SEM data (continuação do lançamento anterior) ─────────────────
+    if(!dataCurrent) continue;
+
+    // Linha: "DESC_TEXTO  NúmDoc  VALOR-  SALDO": "PAGAMENTO CARTAO BCE  171044  234,84-  30,68"
+    const reComDoc = /^(.+?)\s{2,}(\d{4,})\s+(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})([-]?)\s*$/.exec(l);
+    if(reComDoc){ commitItem(reComDoc[1].trim(), reComDoc[3], reComDoc[4]==='-'); descLines=[]; continue; }
+
+    // Linha de nº doc puro + valores: "171044 234,84- 30,68"
+    m = reDocVal.exec(l);
+    if(m){
+      commitItem(descLines.join(' '), m[1], m[2]==='-');
+      descLines=[]; continue;
+    }
+
+    // Linha com desc + valores: "PIXRECEBIDO - 300,00 63,83"
+    m = reSemData2.exec(l);
+    if(m){
+      // Nova transação sem data → usar dataCurrent (mesma data do anterior)
+      commitItem(m[1].trim(), m[2], m[3]==='-');
+      descLines=[]; continue;
+    }
+
+    m = reSemData1.exec(l);
+    if(m){ commitItem(m[1].trim(),m[2],m[3]==='-'); descLines=[]; continue; }
+
+    // Valores puros: "- 500,00" ou "300,00"
+    m = reValPuro.exec(l);
+    if(m){
+      commitItem(descLines.join(' '), m[1], m[2]==='-');
+      descLines=[]; continue;
+    }
+
+    // Continuação de descrição (não é número, não é data)
+    if(!/^\d{5,}/.test(l) && !/^[\d\s,.-]+$/.test(l)){
+      descLines.push(l);
+    }
+  }
+
+  // Detectar saldo real da conta Santander
+  // USAR APENAS "Saldo de Conta Corrente em DD/MM" — NÃO usar "Saldo Disponível Total"
+  // pois o "Saldo Disponível Total" inclui o Limite de Cheque Especial
+  for(let i=0; i<linhas.length; i++){
+    const l = linhas[i];
+
+    // ✅ Correto: "Saldo de Conta Corrente em 31/05  63,83" (sem limite)
+    // Pegar o ÚLTIMO ocorrência (mais recente) para ter o saldo final do período
+    const mSC = /saldo de conta corrente em (\d{2}\/\d{2})\s+(\d{1,3}(?:\.\d{3})*,\d{2})/i.exec(l);
+    if(mSC){
+      const v = parseFloat(mSC[2].replace(/\./g,'').replace(',','.'));
+      const p = mSC[1].split('/');
+      if(!isNaN(v)){
+        // Sempre sobrescrever para pegar a data mais recente
+        window._saldoDetectado = {
+          valor: v,
+          data: `${anoExtrato}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`,
+          dataLabel: mSC[1]
+        };
+      }
+    }
+
+    // ❌ Ignorar: "Saldo Disponível Total em 31/05  6.663,83" (inclui limite)
+    // ❌ Ignorar: "Saldo Disponível de Conta Corrente  63,83" (pode incluir limite)
+    // Não fazer nada com essas linhas
+  }
+
+  return items;
+}
+
+
+// ── PARSER FATURA CARTÃO ──────────────────────────────────────────────────────
+// Suporta: Latam Pass (Itaú), Nubank, Inter, Bradesco, Santander
+// ── PARSER STONE / CONECTA BRASIL ────────────────────────────────────────────
+// Formato: CONTRAPARTE \n DD/MM/AA  Saída/Entrada  R$ VALOR  R$ SALDO \n Tipo | Pix
+function parsearExtratoStone(linhas){
+  const items = [];
+
+  const reIgn  = /^(extrato de conta|emitido em|página|dados da conta|nome\s+documento|instituição|período:|data\s+tipo|stone\s+instit|conecta\s+brasil|transferência|pix$|\|)/i;
+  const reData = /^(\d{2}\/\d{2}\/\d{2,4})\s+(saída|entrada)\s+(?:\S+\s+)?[-+]?\s*R\$\s*([\d.]+,\d{2})\s+R\$\s*([\d.]+,\d{2})/i;
+
+  let contraparte = '';
+  let saldoFinal  = null;
+  let dataFinal   = null;
+  let anoExtrato  = currentMes.split('-')[0];
+
+  // Detectar ano no cabeçalho
+  for(const l of linhas.slice(0, 15)){
+    const m = l.match(/(\d{4})/);
+    if(m && parseInt(m[1]) >= 2020){ anoExtrato = m[1]; break; }
+  }
+
+  for(const l of linhas){
+    if(!l || l.length < 3) continue;
+    if(reIgn.test(l.trim())) continue;
+
+    const m = reData.exec(l);
+    if(m){
+      const dataBruta = m[1]; // DD/MM/AA ou DD/MM/AAAA
+      const tipo  = m[2].toLowerCase() === 'saída' ? 'desp' : 'rec';
+      const valor = parseFloat(m[3].replace(/\./g,'').replace(',','.'));
+      const saldo = parseFloat(m[4].replace(/\./g,'').replace(',','.'));
+
+      // Normalizar data: "29/05/26" → "2026-05-29"
+      let data = dataBruta;
+      const partes = dataBruta.split('/');
+      if(partes.length === 3){
+        let ano = partes[2];
+        if(ano.length === 2) ano = '20' + ano;
+        data = `${ano}-${partes[1].padStart(2,'0')}-${partes[0].padStart(2,'0')}`;
+      }
+
+      const desc = contraparte || (tipo==='desp' ? 'Pagamento PIX' : 'Recebimento PIX');
+
+      items.push({
+        data,
+        desc: cleanDesc(desc),
+        valor: Math.abs(valor),
+        tipo,
+        catId: autoCat(desc, tipo),
+        parcAtual: 1, parcTotal: 1,
+        nota: 'Stone/Conecta',
+        _sel: true
+      });
+
+      // Guardar saldo mais recente (último lançamento do extrato)
+      saldoFinal = saldo;
+      dataFinal  = data;
+      contraparte = '';
+      continue;
+    }
+
+    // Linha de contraparte: não é data, não é ignorada → é o nome do favorecido/remetente
+    if(!reIgn.test(l.trim()) && !/^(R\$|[-+]|\d{2}\/\d{2})/.test(l.trim())){
+      contraparte = l.trim().slice(0, 50);
+    }
+  }
+
+  // Detectar saldo final (último saldo do extrato = saldo mais recente)
+  // Stone mostra saldo em ordem decrescente (mais recente primeiro)
+  // Então o PRIMEIRO saldo é o mais recente
+  if(items.length > 0){
+    const primeiroItem = items[0]; // mais recente (extrato decrescente)
+    // Reconstruir o saldo do primeiro lançamento
+    const mSaldo = linhas.find(l => {
+      const m = reData.exec(l);
+      return m && m[4];
+    });
+    if(mSaldo){
+      const m = reData.exec(mSaldo);
+      const s = parseFloat(m[4].replace(/\./g,'').replace(',','.'));
+      if(!isNaN(s)){
+        window._saldoDetectado = {
+          valor: s,
+          data:  items[0].data,
+          dataLabel: items[0].data.split('-').reverse().join('/')
+        };
+      }
+    }
+  }
+
+  return items;
+}
+
+function parsearFatura(txt){
+  const lines  = txt.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
+  const items  = [];
+  const filtro = getCartaoFiltro();
+
+  // ── Detectores ─────────────────────────────────────────────────────────────
+  // Parar antes de parcelamentos futuros
+  const reParar = /Compras parceladas.*próximas|Total dos lançamentos|próximas faturas/i;
+
+  // Total de seção: "Lançamentos no cartão (final XXXX)" — vem ANTES do rePortador
+  const reTotalSec = /Lançamentos no cartão \(final/i;
+
+  // Portador real: linha que SÓ tem nome + (final XXXX), sem "Lançamentos" antes
+  // Ex: "FABIANO BASTOS (final 9855)" ou "NATALIA OLIVEIRA (final 5985)"
+  const rePortador = /^[^(]*\(final\s*(\d{4})\)/;
+  const reNomePort = /^([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇa-záéíóúâêîôûãõç\s]{2,})\s*\(final\s*(\d{4})\)\s*$/;
+
+  // Lançamento: [prefixo_opcional] DD/MM ESTABELECIMENTO VALOR
+  const reLanc = /^.{0,4}(\d{2}\/\d{2})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
+
+  // Categoria (linha após lançamento — ignorar)
+  const reCat = /^(ALIMENTA[ÇC]|TURISMO|DIVERSOS|SA[ÚU]DE|VESTU[ÁA]RIO|VE[ÍI]CULOS|MORADIA|EDUCA[ÇC]|HOBBY|OUTROS|SAO |SAN |LONDON|ZURICH|MOUNTAIN|CURITIBA|FLORIANOPOLIS|PALHOCA|OSASCO|BELO|BRASILIA|Palhoca|Palhoa|Osasco|Sao Paulo|Barueri|Contagem|Alexandria|Curitiba|Rio do Sul)/i;
+
+  // Linhas de cabeçalho/rodapé a ignorar
+  const reIgnorar = /^(data$|estabelecimento$|valor em r\$|continua\.|PC\s*-|4004|0800|postagem|vencimento|emissão|o total|com vencimento|pagamento\s+(efetuado|mínimo|obrigatório)|parcelas fixas|juros|iof|cet|banco|número do|nome do|endereço|instruções|local de|sacador|data do|uso do|espécie|aceite|nosso número|total desta|saldo financ|total da fatura|previsão|repasse de iof|total lanç|lançamentos produtos|total dos lanç|compras parceladas|próxima fatura|demais faturas|total para próximas|limites de créd|limite total|limite disp|limite máx|encargos cobrados|juros do rot|juros de mora|multa|novo teto|simulação|valor compra|valor do iof|valor total fin|valor juros|quantidade|valor da parc|valor total a pagar|de retirada|de pagamento|dólar de conv|total transaç|lançamentos inter|lançamentos no cartão|anuidade|estorno de anuidade|titular\s+\d)/i;
+
+  // Usar o FINAL do cartão como chave única do portador (mais confiável que o nome)
+  let titularFinal = '';  // primeiro final visto = titular
+  let secao        = 'desconhecido';
+
+  for(const l of lines){
+    // Parar ao chegar em parcelamentos futuros
+    if(reParar.test(l)) break;
+
+    // Ignorar cabeçalhos/rodapés — ANTES de tudo
+    if(reIgnorar.test(l)) continue;
+
+    // Total de seção → resetar portador (e ignorar esta linha)
+    if(reTotalSec.test(l)){ secao='desconhecido'; continue; }
+
+    // Detectar portador pelo nome + final (linha que SÓ tem isso)
+    const mNome = reNomePort.exec(l);
+    if(mNome){
+      const final = mNome[2];
+      if(!titularFinal) titularFinal = final;  // primeiro = titular
+      secao = (final === titularFinal) ? 'titular' : 'adicional';
+      continue;
+    }
+
+    // Ignorar categoria/cidade
+    if(reCat.test(l)) continue;
+
+    // Tentar parsear lançamento
+    const m = reLanc.exec(l);
+    if(!m) continue;
+
+    const data  = m[1];
+    const desc  = m[2].trim();
+    const valor = parseFloat(m[3].replace(/\./g,'').replace(',','.'));
+
+    if(isNaN(valor) || valor <= 0) continue;
+    if(desc.length < 2) continue;
+
+    // Detectar parcela: "JM INFORMATICA 02/02" → 2ª de 2
+    const mParc    = desc.match(/\s+(\d{2})\/(\d{2})\s*$/);
+    const parcAtual = mParc ? parseInt(mParc[1]) : 1;
+    const parcTotal = mParc ? parseInt(mParc[2]) : 1;
+    const descLimpa = cleanDesc(mParc ? desc.slice(0, desc.lastIndexOf(mParc[0])) : desc);
+
+    // Filtro de portador
+    const selecionado = filtro==='todos' ||
+      (filtro==='titular'   && secao==='titular')   ||
+      (filtro==='adicional' && secao==='adicional');
+
+    items.push({
+      data,
+      desc: descLimpa,
+      valor,
+      tipo:     'desp',
+      catId:    autoCat(descLimpa, 'desp'),
+      parcAtual,
+      parcTotal,
+      nota:     secao==='adicional' ? 'Cartão adicional' : secao==='titular' ? 'Cartão titular' : '',
+      _sel:     selecionado
+    });
+  }
+
+  // Filtrar conforme portador selecionado
+  return filtro==='todos' ? items : items.filter(i=>i._sel);
+}
+
+// ── AUTO-CATEGORIZAÇÃO ────────────────────────────────────────────────────────
+function autoCat(desc, tipo){
+  const d = desc.toUpperCase();
+
+  if(tipo==='rec'){
+    const mapRec = [
+      [['SALARIO','SALÁRIO','FOLHA PAGAMENTO','HOLERITE'], 'Salário'],
+      [['FREELANCE','PRESTACAO','PRESTAÇÃO','PJ ','SERVIÇO','SERVICO'], 'Freelance'],
+      [['DIVIDENDO','RENDIMENTO','JUROS','RESGATE','CDB','LCI','LCA','TESOURO'], 'Investimentos'],
+    ];
+    for(const [keys,nome] of mapRec){
+      if(keys.some(k=>d.includes(k))){
+        return DB.categorias.find(c=>c.nome===nome&&(c.tipo==='rec'||c.tipo==='both'))?.id
+          ||DB.categorias.find(c=>c.tipo==='rec'||c.tipo==='both')?.id;
+      }
+    }
+    return DB.categorias.find(c=>c.nome==='Outros ganhos'&&(c.tipo==='rec'||c.tipo==='both'))?.id
+      ||DB.categorias.find(c=>c.tipo==='rec'||c.tipo==='both')?.id;
+  }
+
+  const mapDesp = [
+    [['MERCADO','SUPERMERCADO','BISTEK','GIASSI','ATACADO','ATACADAO','HIPPO','CARREFOUR','EXTRA','PÃO DE AÇÚCAR','PAO DE ACUCAR','HORTIFRUTI','SACOLAO'], 'Mercado'],
+    [['RESTAURANTE','SUSHI','PIZZA','HAMBUR','BURGER','LANCHE','BAR ','BOTECO','OUTBACK','ARTUSI','DEVITO','CHURRASCARIA','GASTRONOMIA','BISTRÔ','BISTRO','PADARIA','PANIFICADORA','PAOEPROSA','WORLD COOKIES','CAFE','COFFEE','SNACK'], 'Alimentação'],
+    [['IFOOD','RAPPI','UBER EATS','DELIVERY'], 'Alimentação'],
+    [['FARMACIA','DROGARIA','RAIA','PANVEL','ULTRAFARMA','LABORATORIO','CLINICA','HOSPITAL','MEDICO','MÉDICO','SAUDE','SAÚDE','EXAME','CONSULTA','PLANO DE SAUDE'], 'Saúde'],
+    [['POSTO DE GASOLINA','COMBUSTIVEL','GASOLINA','ETANOL','DIESEL','POSTO ','SHELL','PETROBRAS','IPIRANGA','AUTO POSTO'], 'Transporte'],
+    [['UBER ','CABIFY','99APP','TAXI','ÔNIBUS','ONIBUS','METRO','METRÔ','SPTrans'], 'Transporte'],
+    [['LOCALIZA','MOVIDA','UNIDAS','ALUGUEL DE CARRO','RENT A CAR'], 'Transporte'],
+    [['ALUGUEL','CONDOMINIO','CONDOMÍNIO','CELESC','CEMIG','COELBA','COPEL','ENEL','ENERGIA ELETRICA','ÁGUA E ESGOTO','SABESP','SANEAGO','EMBASA','IPTU','LOCAÇÃO'], 'Moradia'],
+    [['NETFLIX','SPOTIFY','AMAZON PRIME','YOUTUBE','DISNEY','HBO','GLOBOPLAY','DEEZER','APPLE TV','PARAMOUNT','STAR+'], 'Assinaturas'],
+    [['VIVO','TIM','CLARO','OI ','NET ','NEXTEL','OPERADORA','PLANO CELULAR','INTERNET FIXA'], 'Assinaturas'],
+    [['ZARA','RENNER','RIACHUELO','MARISA','HERING','SHEIN','SHOPEE','MERCADO LIVRE','MANTO SPORTS','DECATHLON','CENTAURO','CALCADO','SAPATARIA'], 'Roupas'],
+    [['ESCOLA','FACULDADE','UNIVERSIDADE','CURSO','LIVRO','LIVRARIA','EDUCAÇÃO','EDUCACAO','IDIOMA','MENSALIDADE'], 'Educação'],
+    [['CINEMA','TEATRO','SHOW','INGRESSO','VIAGEM','HOTEL','AIRBNB','POUSADA','RESORT','PARQUE','LAZER'], 'Lazer'],
+    [['ACADEMIA','GYM','CROSSFIT','SMARTFIT','BODYTECH','PERSONAL','PILATES','YOGA'], 'Saúde'],
+  ];
+
+  for(const [keys,nome] of mapDesp){
+    if(keys.some(k=>d.includes(k))){
+      return DB.categorias.find(c=>c.nome===nome&&(c.tipo==='desp'||c.tipo==='both'))?.id
+        ||DB.categorias.find(c=>c.tipo==='desp'||c.tipo==='both')?.id;
+    }
+  }
+  return DB.categorias.find(c=>c.nome==='Outros gastos'&&(c.tipo==='desp'||c.tipo==='both'))?.id
+    ||DB.categorias.find(c=>c.tipo==='desp'||c.tipo==='both')?.id;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function normData(d, anoContexto){
+  // Normaliza data para "YYYY-MM-DD"
+  // anoContexto: ano a usar quando a data não tem ano (ex: extrato de 6 meses)
+  d = d.trim();
+  const mMap = {jan:'01',fev:'02',mar:'03',abr:'04',mai:'05',jun:'06',jul:'07',ago:'08',set:'09',out:'10',nov:'11',dez:'12'};
+
+  // Formato "28 jan 2026" ou "28 jan"
+  const mStr = d.match(/^(\d{2})\s+([a-z]{3})(?:\s+(\d{4}))?$/i);
+  if(mStr){
+    const ano = mStr[3]||(anoContexto||currentMes.split('-')[0]);
+    const mes = mMap[mStr[2].toLowerCase()]||'01';
+    return `${ano}-${mes}-${mStr[1].padStart(2,'0')}`;
+  }
+  // Formato "DD/MM/YYYY" — ano explícito, retornar diretamente
+  const p = d.split('/');
+  if(p.length===3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+  // Formato "DD/MM" sem ano — inferir ano pelo mês de referência selecionado
+  if(p.length===2){
+    const refYm = document.getElementById('iMesRef')?.value || currentMes;
+    const [refAno, refMes] = refYm.split('-').map(Number);
+    const diaMes = parseInt(p[0]);
+    const mesDat = parseInt(p[1]);
+    // Heurística: se o mês da data for maior que o mês de referência+2, provavelmente é ano anterior
+    let ano = refAno;
+    if(mesDat > refMes + 2) ano = refAno - 1;
+    return `${ano}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+  }
+  return d;
+}
+
+function cleanDesc(d){
+  return d.replace(/\s{2,}/g,' ')
+          .replace(/\*+/g,' ')
+          .replace(/\s+$/,'')
+          .trim()
+          .slice(0,55);
+}
+
+// ── RENDER RESULTADO ──────────────────────────────────────────────────────────
+function renderImpResult(){
+  const filtered = resultFiltro==='todos'
+    ? parsedItems
+    : parsedItems.filter(i=>i.tipo===resultFiltro);
+
+  const total   = filtered.length;
+  const selCount= filtered.filter(i=>i._sel).length;
+
+  document.getElementById('iResTitle').textContent = `${total} lançamento${total!==1?'s':''} detectado${total!==1?'s':''}`;
+
+  // Aviso se houver entradas muito altas (possível saldo capturado)
+  const maxRec = Math.max(...parsedItems.filter(i=>i.tipo==='rec').map(i=>i.valor), 0);
+  const avgRec = parsedItems.filter(i=>i.tipo==='rec').length
+    ? parsedItems.filter(i=>i.tipo==='rec').reduce((s,i)=>s+i.valor,0) / parsedItems.filter(i=>i.tipo==='rec').length
+    : 0;
+  const suspeitos = parsedItems.filter(i=>i.tipo==='rec' && i.valor > avgRec * 5 && i.valor > 5000);
+  if(suspeitos.length){
+    const aviso = document.getElementById('iAvisoSuspeito');
+    if(aviso){
+      aviso.style.display='';
+      aviso.innerHTML='⚠️ <strong>Verifique:</strong> ' + suspeitos.map(i=>`"${i.desc}" (${fmtVRaw(i.valor)})`).join(', ') + ' — pode ser saldo ou limite, não uma entrada real. Desmarque se necessário.';
+    }
+  }
+
+  const ym = document.getElementById('iMesRef').value;
+  const tipoLabel = impTipo==='extrato'?'Extrato':'Fatura';
+  document.getElementById('iResSub').textContent = `${tipoLabel} · ${mesLabel(ym)} · ${selCount} selecionado${selCount!==1?'s':''}`;
+
+  // Badges de resumo
+  const totalRec  = parsedItems.filter(i=>i.tipo==='rec').reduce((s,i)=>s+i.valor,0);
+  const totalDesp = parsedItems.filter(i=>i.tipo==='desp').reduce((s,i)=>s+i.valor,0);
+  document.getElementById('iResumoCats').innerHTML =
+    (totalRec  ? `<span class="badge badge-g">↓ ${fmtVRaw(totalRec)} entradas</span>` : '') +
+    (totalDesp ? `<span class="badge badge-r">↑ ${fmtVRaw(totalDesp)} saídas</span>` : '') +
+    `<span class="badge badge-b">${parsedItems.length} lançamento${parsedItems.length!==1?'s':''}</span>`;
+
+  // Checkbox selecionar todos
+  const chkAll = document.getElementById('iChkAll');
+  if(chkAll) chkAll.checked = filtered.every(i=>i._sel);
+
+  // Contador
+  const sc = document.getElementById('iSelCount');
+  if(sc) sc.textContent = `${selCount} de ${total} selecionado${total!==1?'s':''}`;
+
+  // Listar itens
+  const list = document.getElementById('iLancList');
+  if(!list) return;
+
+  if(!filtered.length){
+    list.innerHTML='<div class="empty" style="padding:24px"><div class="empty-icon">🔍</div><div class="empty-sub">Nenhum lançamento nesse filtro.</div></div>';
+    return;
+  }
+
+  // Agrupar por data para melhor leitura
+  const groups = {};
+  filtered.forEach((it,globalIdx)=>{
+    const key = it.data||'Sem data';
+    if(!groups[key]) groups[key]=[];
+    groups[key].push({it, globalIdx: parsedItems.indexOf(it)});
+  });
+
+  list.innerHTML = Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(data=>{
+    const dataFmt = data!=='Sem data'
+      ? new Date(data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})
+      : 'Sem data';
+    const itensHtml = groups[data].map(({it,globalIdx})=>{
+      const cat = DB.categorias.find(c=>c.id===it.catId)||{icone:'💸',nome:'Outros',cor:'#64748b'};
+      const cor = it.tipo==='rec'?'var(--gr)':'var(--rd)';
+      const sinal = it.tipo==='rec'?'+':'-';
+      const catOpts = DB.categorias
+        .filter(c=>c.tipo===it.tipo||c.tipo==='both')
+        .map(c=>`<option value="${c.id}"${c.id===it.catId?' selected':''}>${c.icone} ${c.nome}</option>`)
+        .join('');
+      return `<div class="imp-res-item${it._sel?'':' unchecked'}" id="impitem_${globalIdx}">
+        <input type="checkbox" class="imp-chk" ${it._sel?'checked':''}
+          onchange="toggleItemSel(${globalIdx},this.checked)"
+          style="margin-top:10px">
+        <div class="imp-res-ico" style="background:${cat.cor}22">${cat.icone}</div>
+        <div class="imp-res-body">
+          <div class="imp-res-desc">${it.desc}</div>
+          <select class="cat-select-inline" onchange="parsedItems[${globalIdx}].catId=this.value;renderImpResult()">
+            ${catOpts}
+          </select>
+          ${it.parcTotal>1?`<div style="font-size:10px;color:var(--am);margin-top:3px">📦 Parcela ${it.parcAtual}/${it.parcTotal}</div>`:''}
+          ${it.nota?`<div style="font-size:10px;color:var(--mu);margin-top:2px">${it.nota}</div>`:''}
+        </div>
+        <div class="imp-res-val" style="color:${cor}">${sinal}${fmtVRaw(it.valor)}</div>
+      </div>`;
+    }).join('');
+
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;padding:6px 0 4px">${dataFmt}</div>
+      <div style="background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:4px 12px">${itensHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleItemSel(idx, checked){
+  parsedItems[idx]._sel = checked;
+  const row = document.getElementById('impitem_'+idx);
+  if(row) row.classList.toggle('unchecked', !checked);
+  // Atualizar header
+  const selCount = parsedItems.filter(i=>i._sel).length;
+  const sc = document.getElementById('iSelCount');
+  if(sc) sc.textContent = `${selCount} de ${parsedItems.length} selecionado${parsedItems.length!==1?'s':''}`;
+  const chkAll = document.getElementById('iChkAll');
+  if(chkAll) chkAll.checked = parsedItems.every(i=>i._sel);
+}
+
+function toggleSelectAll(force){
+  const val = typeof force==='boolean' ? force : !parsedItems.every(i=>i._sel);
+  parsedItems.forEach((it,idx)=>{ it._sel=val; });
+  renderImpResult();
+}
+
+function filtrarResult(tipo, btn){
+  resultFiltro = tipo;
+  document.querySelectorAll('#imp-step2 .imp-type-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderImpResult();
+}
+
+function confirmarImportacao(){
+  const ymRef = document.getElementById('iMesRef').value;
+  const sel = parsedItems.filter(i=>i._sel);
+  if(!sel.length){ showToast('Selecione ao menos um lançamento'); return; }
+  // Verificar limites Free
+  const limImp = checarLimite('importacao', ymRef);
+  if(!limImp.ok){ showUpgradeModal(limImp.msg); return; }
+  const limLancs = checarLimite('importacaoLancs', sel.length);
+  if(!limLancs.ok){ showUpgradeModal(limLancs.msg); return; }
+
+  // Agrupar cada lançamento no seu mês real (pela data do lançamento)
+  // Se não tiver data válida, cai no mês de referência selecionado
+  const mesContados = {};
+  sel.forEach(it=>{
+    const dataFinal = it.data.includes('-') ? it.data : normData(it.data);
+    // Extrair YYYY-MM da data normalizada
+    const parts = dataFinal.split('-');
+    const ym = (parts.length>=2) ? `${parts[0]}-${parts[1]}` : ymRef;
+
+    if(!DB.lancamentos[ym]) DB.lancamentos[ym]=[];
+    DB.lancamentos[ym].push({
+      id: uid(),
+      data: dataFinal,
+      desc: it.desc,
+      valor: it.valor,
+      tipo: it.tipo,
+      catId: it.catId||DB.categorias[0]?.id,
+      parcAtual: it.parcAtual||1,
+      parcTotal: it.parcTotal||1,
+      nota: it.nota||''
+    });
+    mesContados[ym] = (mesContados[ym]||0) + 1;
+  });
+  // Registrar uso da importação no mês de referência
+  const mesImpKey = ymRef.substring(0,7);
+  if(!DB.uso.importacoesMes) DB.uso.importacoesMes={};
+  DB.uso.importacoesMes[mesImpKey]=(DB.uso.importacoesMes[mesImpKey]||0)+1;
+  dbSave();
+
+  // Resumo por mês importado
+  const mesesStr = Object.entries(mesContados)
+    .sort((a,b)=>a[0].localeCompare(b[0]))
+    .map(([ym,n])=>`${mesLabel(ym)} (${n})`)
+    .join(', ');
+
+  // Voltar ao step 1 limpo
+  impVoltarStep1();
+  parsedItems=[];
+  document.getElementById('iTextoRaw').value='';
+  document.getElementById('iDropZone').innerHTML='<div class="drop-zone-icon">📄</div><div class="drop-zone-title">Toque para escolher o PDF</div><div class="drop-zone-sub">ou arraste o arquivo aqui</div><input type="file" id="iFileInput" accept=".pdf,.txt" style="display:none" onchange="handleFileInput(event)">';
+
+  const total = sel.length;
+  // Aplicar saldo detectado automaticamente se existir
+  if(window._saldoDetectado && impTipo === 'extrato'){
+    const sd = window._saldoDetectado;
+    DB.saldoConta     = sd.valor;
+    DB.saldoContaData = sd.data;
+    dbSave();
+    window._saldoDetectado = null;
+    const saldoStr = 'R$ ' + Math.abs(sd.valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    // Avisar que o saldo foi definido e pode precisar de atualização manual
+    const totalMsg = `✅ ${total} lançamento${total!==1?'s':''} importado${total!==1?'s':''}`;
+    showToast(totalMsg);
+    // Mostrar aviso de saldo detectado com opção de confirmar ou corrigir
+    setTimeout(()=>{
+      const m = document.createElement('div');
+      m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+      m.innerHTML=`
+        <div style="background:#1e293b;border-radius:24px 24px 0 0;padding:24px 20px 40px;width:100%;max-width:430px;border-top:1px solid #334155">
+          <div style="width:36px;height:4px;background:#334155;border-radius:2px;margin:0 auto 16px"></div>
+          <div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:6px">💰 Confirmar saldo em conta</div>
+          <div style="font-size:12px;color:#64748b;margin-bottom:6px;line-height:1.6">
+            O extrato indica <strong style="color:#22d3a5">${saldoStr}</strong> em ${sd.dataLabel}.
+          </div>
+          <div style="font-size:12px;color:#fbbf24;margin-bottom:16px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:10px;line-height:1.6">
+            ⚠️ Verifique se o saldo atual da conta é diferente desse valor (ex: se houve movimentos após o extrato).
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button onclick="this.closest('div[style*=fixed]').remove();renderInicio()"
+              style="width:100%;padding:13px;border-radius:12px;border:none;background:#22d3a5;color:#0f172a;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">
+              ✓ Confirmar ${saldoStr}
+            </button>
+            <button onclick="this.closest('div[style*=fixed]').remove();setTimeout(()=>abrirModalSaldo(),100)"
+              style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #6366f1;background:rgba(99,102,241,.1);color:#a78bfa;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+              ✎ Corrigir saldo manualmente
+            </button>
+          </div>
+        </div>`;
+      m.onclick=(e)=>{if(e.target===m){m.remove();renderInicio();}};
+      document.body.appendChild(m);
+    }, 600);
+  } else {
+    showToast(`✅ ${total} lançamento${total!==1?'s':''} em ${Object.keys(mesContados).length} mês${Object.keys(mesContados).length!==1?'es':''}`);
+    // Se for extrato e não detectou saldo, sugerir inserir manualmente
+    if(impTipo === 'extrato'){
+      setTimeout(()=>{
+        const m = document.createElement('div');
+        m.style.cssText='position:fixed;bottom:calc(80px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #334155;border-radius:14px;padding:14px 18px;z-index:9999;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:390px;width:calc(100% - 32px)';
+        m.innerHTML=`<div style="flex:1;font-size:12px;color:#94a3b8;line-height:1.5">Quer registrar o saldo atual da sua conta?</div>
+          <button onclick="this.closest('div[style*=fixed]').remove();setTimeout(()=>abrirModalSaldo(),100)" style="padding:8px 14px;border-radius:10px;border:none;background:#6366f1;color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">+ Inserir</button>
+          <button onclick="this.closest('div[style*=fixed]').remove()" style="padding:8px;border-radius:8px;border:none;background:transparent;color:#64748b;font-size:16px;cursor:pointer">✕</button>`;
+        document.body.appendChild(m);
+        setTimeout(()=>{ if(m.parentNode) m.remove(); }, 8000);
+      }, 600);
+    }
+  }
+
+  // Atualizar tela de início se estiver ativo
+  if(currentTab==='inicio') renderInicio();
+}
+
+// ── SALDO EM CONTA ───────────────────────────────────────────────────────────
+function abrirModalSaldo(){
+  // Preencher valores existentes
+  document.getElementById('fSaldoConta').value = DB.saldoConta != null ? DB.saldoConta : '';
+  document.getElementById('fSaldoData').value  = DB.saldoContaData || hoje();
+  // Mostrar botão remover só se já tiver saldo
+  const btnLimpar = document.getElementById('btnLimparSaldo');
+  if(btnLimpar) btnLimpar.style.display = DB.saldoConta != null ? '' : 'none';
+  // Abrir drawer
+  openDrawer('drawerSaldo');
+  setTimeout(()=>{ document.getElementById('fSaldoConta').focus(); }, 300);
+}
+
+function fecharModalSaldo(){
+  closeAllDrawers();
+}
+
+function salvarSaldoConta(){
+  const valStr = document.getElementById('fSaldoConta').value;
+  const data   = document.getElementById('fSaldoData').value;
+  const val    = parseFloat(valStr);
+  if(isNaN(val)){ showToast('Informe um valor válido'); return; }
+  if(!data)     { showToast('Informe a data de referência'); return; }
+  DB.saldoConta     = val;
+  DB.saldoContaData = data;
+  dbSave();
+  closeAllDrawers();
+  showToast('Saldo atualizado ✓');
+  if(currentTab === 'inicio') renderInicio();
+}
+
+function limparSaldoConta(){
+  DB.saldoConta     = null;
+  DB.saldoContaData = null;
+  dbSave();
+  closeAllDrawers();
+  showToast('Saldo removido');
+  if(currentTab === 'inicio') renderInicio();
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+// Boot seguro — detecta e corrige localStorage corrompido
+try {
+  dbLoad();
+} catch(e) {
+  storage.removeItem(DB_KEY);
+}
+
+// Se DB.user existir e for válido, ir direto pro app
+if(DB.user && DB.user.nome && typeof DB.user.nome === 'string'){
+  currentMes = mesAtual();
+  initApp();
+} else {
+  // Garantir estado limpo para o onboarding
+  DB.user = null;
+  DB.categorias = [];
+  DB.lancamentos = {};
+  DB.settings = {privacidade: false};
+  document.getElementById('s-onboard').classList.add('active');
+}
+// Chips no onboarding
+// Perfil: single-select (stopPropagation para não conflitar com listener genérico)
+document.querySelectorAll('#ob-perfil-chips .chip').forEach(c=>{
+  c.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    document.querySelectorAll('#ob-perfil-chips .chip').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
+// Bancos: multi-select livre
+document.querySelectorAll('#ob-banco-chips .chip').forEach(c=>{
+  c.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    c.classList.toggle('sel');
+  });
+});
+</script>
+
+<!-- ── BOTÃO IA ───────────────────────────────────────────────────────────── -->
+<button class="ai-chat-btn" id="ai-chat-btn" onclick="abrirChat()" title="Assistente financeiro IA">✨</button>
+
+<!-- ── TELA DE CHAT ──────────────────────────────────────────────────────── -->
+<div class="ai-chat-screen" id="ai-chat-screen">
+  <div class="ai-chat-header">
+    <div class="ai-chat-avatar">✨</div>
+    <div>
+      <div style="font-size:14px;font-weight:700">Assistente Finia</div>
+      <div style="font-size:11px;color:var(--mu)">IA com seus dados financeiros</div>
+    </div>
+    <button onclick="fecharChat()" style="margin-left:auto;background:transparent;border:none;color:var(--mu);font-size:22px;cursor:pointer;padding:4px">×</button>
+  </div>
+  <div class="ai-chat-messages" id="ai-chat-messages">
+    <!-- Mensagens adicionadas via JS -->
+  </div>
+  <div class="ai-chat-input-wrap">
+    <textarea class="ai-chat-input" id="ai-chat-input" rows="1"
+      placeholder="Pergunte sobre seus gastos..."
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagem()}"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+    <button class="ai-send-btn" id="ai-send-btn" onclick="enviarMensagem()">↑</button>
+  </div>
+</div>
+
+<script>
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── SISTEMA DE IA ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+const IA_PROXY = '/.netlify/functions/ai-parser';
+let chatHistorico = [];
+let chatAberto    = false;
+let iaSendindo    = false;
+
+// ── Contexto financeiro compacto para enviar à IA ─────────────────────────────
+function gerarContextoIA(){
+  const meses = Object.keys(DB.lancamentos).sort().slice(-6);
+  const resumoMeses = meses.map(ym => {
+    const lancs = DB.lancamentos[ym] || [];
+    const rec   = lancs.filter(l=>l.tipo==='rec').reduce((s,l)=>s+l.valor,0);
+    const desp  = lancs.filter(l=>l.tipo==='desp').reduce((s,l)=>s+l.valor,0);
+    const cats  = {};
+    lancs.filter(l=>l.tipo==='desp').forEach(l=>{
+      const cat = DB.categorias.find(c=>c.id===l.catId);
+      const nome = cat?.nome || 'Outros';
+      cats[nome] = (cats[nome]||0) + l.valor;
+    });
+    const topCats = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5)
+      .map(([n,v])=>`${n}: R$${v.toFixed(0)}`).join(', ');
+    return `${ym}: entradas R$${rec.toFixed(0)}, saídas R$${desp.toFixed(0)}, saldo R$${(rec-desp).toFixed(0)} | gastos: ${topCats}`;
+  }).join('\n');
+
+  const parcelados = Object.values(DB.lancamentos).flat()
+    .filter(l=>l.parcTotal>1&&l.tipo==='desp')
+    .map(l=>`${l.desc} ${l.parcAtual}/${l.parcTotal} R$${l.valor.toFixed(0)}`);
+
+  const saldoAtual = typeof calcularSaldoAtual === 'function' ? calcularSaldoAtual() : null;
+
+  return `DADOS FINANCEIROS DO USUÁRIO (${DB.user?.nome||'usuário'}):
+Saldo atual em conta: ${saldoAtual !== null ? 'R$'+saldoAtual.toFixed(2) : 'não informado'}
+Mês atual: ${currentMes}
+
+HISTÓRICO (últimos 6 meses):
+${resumoMeses}
+
+PARCELAMENTOS ATIVOS: ${parcelados.length > 0 ? parcelados.slice(0,8).join('; ') : 'nenhum'}
+
+CATEGORIAS DISPONÍVEIS: ${DB.categorias.map(c=>c.nome).join(', ')}`;
+}
+
+// ── Chamada à API via proxy ───────────────────────────────────────────────────
+async function chamarIA(prompt, sistemPrompt, maxTokens = 800){
+  const resp = await fetch(IA_PROXY, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ prompt, sistemPrompt, maxTokens })
+  });
+  if(!resp.ok){
+    const err = await resp.text();
+    throw new Error(`Erro ${resp.status}: ${err.slice(0,150)}`);
+  }
+  const data = await resp.json();
+  if(data.error) throw new Error(data.error);
+  return data.content?.map(b=>b.text||'').join('') || '';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NÍVEL 1 — CHAT FINANCEIRO
+// ══════════════════════════════════════════════════════════════════════════════
+
+function abrirChat(){
+  if(!isPro()){ showUpgradeModal('O assistente financeiro IA é exclusivo do plano Pro.\n\nFaça perguntas sobre seus gastos e receba análises personalizadas.'); return; }
+  chatAberto = true;
+  document.getElementById('ai-chat-screen').classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Mensagem inicial se primeira vez
+  if(chatHistorico.length === 0){
+    const saldo = typeof calcularSaldoAtual === 'function' ? calcularSaldoAtual() : null;
+    const saldoStr = saldo !== null ? `R$ ${saldo.toLocaleString('pt-BR',{minimumFractionDigits:2})}` : 'não informado';
+    adicionarMensagemChat('ai', `Olá, ${DB.user?.nome?.split(' ')[0] || 'tudo bem'}! 👋\n\nSou seu assistente financeiro. Seu saldo atual é **${saldoStr}**.\n\nPosso te ajudar a analisar seus gastos, encontrar onde economizar, comparar meses ou entender suas parcelas. O que quer saber?`);
+    chatHistorico.push({
+      role:'assistant',
+      content: `Olá! Sou seu assistente financeiro pessoal. Saldo atual: ${saldoStr}.`
+    });
+  }
+  setTimeout(()=> document.getElementById('ai-chat-input')?.focus(), 300);
+}
+
+function fecharChat(){
+  chatAberto = false;
+  document.getElementById('ai-chat-screen').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function adicionarMensagemChat(tipo, texto, isLoading = false){
+  const wrap = document.getElementById('ai-chat-messages');
+  if(!wrap) return null;
+  const div = document.createElement('div');
+  div.className = `ai-msg ${tipo}${isLoading?' loading':''}`;
+  // Renderizar markdown simples: **bold**, *italic*, listas
+  div.innerHTML = texto
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/\n/g,'<br>');
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+
+async function enviarMensagem(){
+  const input = document.getElementById('ai-chat-input');
+  const msg = input?.value?.trim();
+  if(!msg || iaSendindo) return;
+  input.value = '';
+  input.style.height = 'auto';
+
+  iaSendindo = true;
+  document.getElementById('ai-send-btn').disabled = true;
+
+  adicionarMensagemChat('user', msg);
+  chatHistorico.push({role:'user', content: msg});
+
+  const loadingEl = adicionarMensagemChat('ai', '...', true);
+
+  try {
+    const contexto  = gerarContextoIA();
+    const sistemMsg = `Você é um assistente financeiro pessoal integrado ao app Finia. Analise os dados reais do usuário e responda de forma direta, prática e em português brasileiro simples. Use números reais dos dados. Seja conciso (máx 3-4 parágrafos). Use **negrito** para destacar valores importantes.\n\n${contexto}`;
+
+    // Construir histórico para contexto (últimas 6 trocas)
+    const hist = chatHistorico.slice(-12).map(m=>
+      `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content}`
+    ).join('\n\n');
+
+    const resposta = await chamarIA(
+      `${hist}\n\nUsuário: ${msg}\n\nAssistente:`,
+      sistemMsg, 600
+    );
+
+    if(loadingEl) loadingEl.remove();
+    adicionarMensagemChat('ai', resposta);
+    chatHistorico.push({role:'assistant', content: resposta});
+
+  } catch(err) {
+    if(loadingEl){ loadingEl.textContent = '⚠️ Erro ao conectar. Verifique sua conexão.'; loadingEl.classList.remove('loading'); }
+  } finally {
+    iaSendindo = false;
+    document.getElementById('ai-send-btn').disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NÍVEL 2 — INSIGHTS PROATIVOS
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function gerarInsightIA(){
+  const wrap = document.getElementById('insight-ai-wrap');
+  if(!wrap) return;
+
+  // Só para usuários Pro
+  if(!isPro()){ wrap.innerHTML=''; return; }
+
+  // Cache: gerar no máximo 1x por dia
+  const cacheKey = `finia_insight_${currentMes}`;
+  const hoje_str = new Date().toISOString().slice(0,10);
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey)||'null');
+    if(cached && cached.data === hoje_str && cached.texto){
+      renderInsightCard(cached.texto);
+      return;
+    }
+  } catch{}
+
+  // Mostrar loading
+  wrap.innerHTML = `<div class="insight-ai-card" style="opacity:.5">
+    <div class="insight-ai-badge">✨ IA</div>
+    <div class="insight-ai-text" style="animation:pulse 1.2s infinite">Analisando seus dados...</div>
+  </div>`;
+
+  try {
+    const ctx = gerarContextoIA();
+    const prompt = `${ctx}\n\nGere UM insight financeiro curto e prático sobre os dados deste usuário. Seja direto, use números reais, foque no mês atual (${currentMes}). Máximo 2 frases. Use **negrito** nos valores importantes. Comece com um emoji relevante.`;
+
+    const texto = await chamarIA(prompt, 'Você é um analista financeiro. Responda em português brasileiro, de forma direta e prática. Máximo 2 frases.', 200);
+
+    // Salvar no cache
+    localStorage.setItem(cacheKey, JSON.stringify({data: hoje_str, texto}));
+    renderInsightCard(texto);
+
+  } catch(err) {
+    // Mostrar mensagem de erro amigável em vez de sumir
+    wrap.innerHTML = `<div class="insight-ai-card" style="opacity:.6;cursor:pointer" onclick="gerarInsightIA()">
+      <div class="insight-ai-badge">✨ IA</div>
+      <div class="insight-ai-text" style="color:var(--mu)">Análise IA indisponível. Verifique se a Netlify Function foi deployada. Toque para tentar novamente.</div>
+    </div>`;
+  }
+}
+
+function renderInsightCard(texto){
+  const wrap = document.getElementById('insight-ai-wrap');
+  if(!wrap) return;
+  wrap.innerHTML = `
+    <div class="insight-ai-card" onclick="abrirChat()" style="cursor:pointer">
+      <div class="insight-ai-badge">✨ Análise IA</div>
+      <div class="insight-ai-text">${texto.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</div>
+      <div style="font-size:10px;color:var(--mu);margin-top:8px">Toque para conversar com o assistente →</div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NÍVEL 3 — CATEGORIZAÇÃO INTELIGENTE
+// ══════════════════════════════════════════════════════════════════════════════
+
+let _catSuggestTimeout = null;
+let _catSuggestAbort   = false;
+
+async function sugerirCategoriaIA(desc){
+  if(!isPro() || !desc || desc.length < 3) return;
+  _catSuggestAbort = false;
+
+  // Debounce — aguardar 800ms sem digitar
+  clearTimeout(_catSuggestTimeout);
+  _catSuggestTimeout = setTimeout(async ()=>{
+    if(_catSuggestAbort) return;
+
+    // Histórico de categorizações do usuário (aprendizado)
+    const exemplos = Object.values(DB.lancamentos).flat()
+      .filter(l=>l.desc && l.catId)
+      .slice(-30)
+      .map(l=>{
+        const cat = DB.categorias.find(c=>c.id===l.catId);
+        return `"${l.desc}" → ${cat?.nome||'Outros'}`;
+      }).join('\n');
+
+    const cats = DB.categorias.map(c=>c.nome).join(', ');
+    const prompt = `Categorias disponíveis: ${cats}\n\nExemplos de categorizações deste usuário:\n${exemplos||'(nenhum ainda)'}\n\nQual categoria melhor se encaixa para o lançamento: "${desc}"?\nResponda APENAS com o nome exato da categoria, nada mais.`;
+
+    try {
+      const resposta = await chamarIA(prompt, 'Você categoriza lançamentos financeiros. Responda apenas com o nome exato da categoria.', 30);
+      if(_catSuggestAbort) return;
+
+      const nomeSug = resposta.trim().replace(/['"]/g,'');
+      const cat = DB.categorias.find(c=>c.nome.toLowerCase()===nomeSug.toLowerCase());
+      if(cat) mostrarSugestaoCat(cat);
+    } catch{}
+  }, 800);
+}
+
+function mostrarSugestaoCat(cat){
+  // Remover sugestão anterior
+  document.querySelectorAll('.cat-suggest').forEach(el=>el.remove());
+
+  const sel = document.getElementById('lanc-cat');
+  if(!sel) return;
+
+  const sugestao = document.createElement('div');
+  sugestao.className = 'cat-suggest';
+  sugestao.innerHTML = `
+    <div style="font-size:20px">${cat.icone}</div>
+    <div>
+      <div class="cat-suggest-label">✨ Sugestão IA</div>
+      <div class="cat-suggest-name">${cat.nome}</div>
+    </div>
+    <div style="margin-left:auto;font-size:11px;color:var(--mu)">Aplicar</div>`;
+  sugestao.onclick = ()=>{
+    sel.value = cat.id;
+    sugestao.remove();
+  };
+
+  sel.parentElement.insertBefore(sugestao, sel);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IMPORTAÇÃO UNIVERSAL VIA IA
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function rodarParserIA(){
+  const txt = document.getElementById('iTextoRaw').value.trim();
+  if(!txt){ showToast('Cole o texto do extrato ou fatura primeiro 📋'); return; }
+
+  if(!isPro()){ showUpgradeModal('Importação inteligente com IA é exclusiva do plano Pro.\n\nEntende qualquer banco automaticamente.'); return; }
+
+  const btnIA = document.querySelector('button[onclick="rodarParserIA()"]');
+  if(btnIA){ btnIA.textContent='⏳ Analisando...'; btnIA.disabled=true; }
+
+  const txtTrunc  = txt.length > 9000 ? txt.slice(0,9000)+'\n...(truncado)' : txt;
+  const cats      = DB.categorias.map(c=>`${c.nome} (${c.tipo})`).join(', ');
+  const mesRef    = document.getElementById('iMesRef')?.value || currentMes;
+  const [anoRef]  = mesRef.split('-');
+  const tipoDoc   = impTipo === 'fatura' ? 'fatura de cartão de crédito' : 'extrato bancário';
+
+  const prompt = `Analise este ${tipoDoc} e extraia todos os lançamentos financeiros.
+
+REGRAS:
+1. Retorne APENAS JSON válido, sem texto adicional, sem markdown
+2. Ignore: saldos do dia, limites de conta, rendimentos automáticos de centavos, tarifas bancárias automáticas, IOF, encargos, CET, cabeçalhos, rodapés, resumos, totais
+3. Para cada lançamento: ENTRADA = dinheiro recebido, SAIDA = dinheiro gasto
+4. Data no formato DD/MM. Ano de referência: ${anoRef}
+5. Detecte o banco automaticamente
+6. Para faturas: identifique o portador (titular/adicional) quando houver múltiplos cartões
+7. Detecte parcelas no padrão "02/12" → parcAtual=2, parcTotal=12
+8. Se encontrar saldo final real da conta (não saldo do dia), inclua em saldoFinal
+9. CATEGORIAS DISPONÍVEIS: ${cats}
+
+FORMATO JSON:
+{
+  "banco": "nome do banco",
+  "tipo": "extrato" ou "fatura",
+  "saldoFinal": null ou {"valor": 1234.56, "data": "DD/MM/AAAA"},
+  "lancamentos": [
+    {
+      "data": "DD/MM",
+      "desc": "descrição limpa",
+      "valor": 250.00,
+      "tipo": "SAIDA" ou "ENTRADA",
+      "categoria": "nome da categoria",
+      "parcAtual": 1,
+      "parcTotal": 1,
+      "portador": "titular" ou "adicional" ou null
+    }
+  ]
+}
+
+EXTRATO/FATURA:
+${txtTrunc}`;
+
+  try {
+    window._saldoDetectado = null;
+    const rawText = await chamarIA(prompt, 'Você extrai lançamentos financeiros de extratos e faturas bancárias brasileiras. Retorne apenas JSON válido.', 4000);
+
+    const jsonStr = rawText.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    let resultado;
+    try { resultado = JSON.parse(jsonStr); }
+    catch {
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if(match) resultado = JSON.parse(match[0]);
+      else throw new Error('Resposta não é JSON válido');
+    }
+
+    if(!resultado?.lancamentos?.length) throw new Error('Nenhum lançamento encontrado no documento');
+
+    // Saldo detectado
+    if(resultado.saldoFinal?.valor){
+      const sf = resultado.saldoFinal;
+      const p  = (sf.data||'').split('/');
+      window._saldoDetectado = {
+        valor: sf.valor,
+        data:  p.length>=2 ? `${p[2]||anoRef}-${(p[1]||'01').padStart(2,'0')}-${(p[0]||'01').padStart(2,'0')}` : mesRef+'-01',
+        dataLabel: sf.data||''
+      };
+    }
+
+    // Converter para formato interno
+    parsedItems = resultado.lancamentos.filter(l=>l.valor>0).map(l=>{
+      const catMatch = DB.categorias.find(c=>
+        c.nome.toLowerCase()===(l.categoria||'').toLowerCase() ||
+        c.nome.toLowerCase().includes((l.categoria||'').slice(0,6).toLowerCase())
+      );
+      return {
+        data:      normData(l.data||'01/'+(mesRef.split('-')[1]||'01'), anoRef),
+        desc:      (l.desc||'').slice(0,60),
+        valor:     Math.abs(l.valor),
+        tipo:      l.tipo==='ENTRADA'?'rec':'desp',
+        catId:     catMatch?.id || autoCat(l.desc, l.tipo==='ENTRADA'?'rec':'desp'),
+        parcAtual: l.parcAtual||1,
+        parcTotal: l.parcTotal||1,
+        nota:      l.portador ? `Cartão ${l.portador}` : `${resultado.banco||'IA'}`,
+        _sel:      true,
+        _ia:       true
+      };
+    });
+
+    if(!parsedItems.length) throw new Error('Nenhum lançamento válido encontrado');
+    resultFiltro = 'todos';
+    mostrarStep2();
+
+    // Badge IA
+    setTimeout(()=>{
+      const sub = document.getElementById('iResSub');
+      if(sub) sub.innerHTML += ` · <span style="background:rgba(99,102,241,.15);color:#a78bfa;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px">✨ IA · ${resultado.banco||'Banco detectado'}</span>`;
+    }, 100);
+
+  } catch(err) {
+    showToast('Erro na IA: '+err.message.slice(0,60));
+    console.error(err);
+  } finally {
+    if(btnIA){ btnIA.textContent='✨ IA'; btnIA.disabled=false; }
+  }
+}
+
+// ── Integrar sugestão de categoria no drawer de lançamento ────────────────────
+// Chamado quando o usuário digita a descrição
+document.addEventListener('input', e=>{
+  if(e.target.id === 'lanc-desc' && isPro()){
+    _catSuggestAbort = false;
+    sugerirCategoriaIA(e.target.value);
+  }
+});
+document.addEventListener('click', e=>{
+  if(e.target.id === 'lanc-desc') _catSuggestAbort = false;
+});
+
+// Registrar Service Worker para PWA (só funciona em HTTPS ou localhost)
+if('serviceWorker' in navigator && location.protocol !== 'file:'){
+  window.addEventListener('load', ()=>{
+    // SW inline via blob para não precisar de arquivo separado
+    const swCode = `
+      const CACHE = 'finia-v1';
+      self.addEventListener('install', e=>{
+        e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/'])));
+      });
+      self.addEventListener('fetch', e=>{
+        e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));
+      });
+    `;
+    const blob = new Blob([swCode], {type:'application/javascript'});
+    const swUrl = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swUrl)
+      .then(()=>console.log('Finia SW registrado'))
+      .catch(()=>{}); // Silencioso se falhar
+  });
+  // Manifest dinâmico para instalação como PWA
+  const manifest = {
+    name: 'Finia',
+    short_name: 'Finia',
+    description: 'Seu dinheiro, finalmente no controle.',
+    start_url: (typeof APP_URL !== "undefined" && !APP_URL.includes("COLE_AQUI")) ? APP_URL : location.href,
+    display: 'standalone',
+    background_color: '#0f172a',
+    theme_color: '#0f172a',
+    icons: [{
+      src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%230f172a'/%3E%3Ctext x='96' y='130' text-anchor='middle' font-family='Arial' font-weight='900' font-size='90' fill='%2322d3a5'%3Ef%3C/text%3E%3C/svg%3E",
+      sizes: '192x192', type: 'image/svg+xml'
+    }]
+  };
+  const mBlob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  const mUrl = URL.createObjectURL(mBlob);
+  const link = document.createElement('link');
+  link.rel='manifest'; link.href=mUrl;
+  document.head.appendChild(link);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── SISTEMA DE INSTALAÇÃO PWA ─────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+let _installPrompt = null;  // Evento beforeinstallprompt capturado (Android/Chrome)
+
+// Capturar o evento de instalação assim que o browser o disparar
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();           // Não mostrar o banner automático
+  _installPrompt = e;           // Guardar para usar no botão
+  renderInstallSection();       // Atualizar UI se config já estiver aberta
+});
+
+// Detectar quando o app é instalado
+window.addEventListener('appinstalled', () => {
+  _installPrompt = null;
+  showToast('🎉 Finia instalado com sucesso!');
+  renderInstallSection();
+});
+
+// Detectar o ambiente
+function detectarAmbiente(){
+  const ua        = navigator.userAgent;
+  const isIOS     = /iphone|ipad|ipod/i.test(ua);
+  const isAndroid = /android/i.test(ua);
+  const isSafari  = /safari/i.test(ua) && !/chrome/i.test(ua);
+  const isChrome  = /chrome/i.test(ua) && !/edg/i.test(ua);
+  const isEdge    = /edg/i.test(ua);
+  const isFirefox = /firefox/i.test(ua);
+
+  // Verificar se já está instalado como PWA (standalone)
+  const jaInstalado = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+
+  return { isIOS, isAndroid, isSafari, isChrome, isEdge, isFirefox, jaInstalado };
+}
+
+// Renderizar a seção de instalação na configuração
+function renderInstallSection(){
+  const el = document.getElementById('cfg-instalar-content');
+  if(!el) return;
+
+  const env = detectarAmbiente();
+
+  // Já instalado como PWA
+  if(env.jaInstalado){
+    el.innerHTML = `
+      <div class="installed-badge">
+        <div style="font-size:24px">✅</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--gr)">App instalado!</div>
+          <div style="font-size:11px;color:var(--mu);margin-top:2px">Finia está na sua tela inicial</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Android + Chrome — instalação com 1 clique via prompt nativo
+  if(_installPrompt){
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--mu);margin-bottom:12px;line-height:1.6">
+        Instale o Finia na tela inicial do seu celular. Funciona como um app, sem precisar da loja.
+      </div>
+      <button class="install-btn" onclick="instalarPWA()">
+        <span style="font-size:20px">📲</span>
+        Instalar o Finia agora
+      </button>`;
+    return;
+  }
+
+  // iOS Safari — guia visual passo a passo
+  if(env.isIOS && env.isSafari){
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--mu);margin-bottom:14px;line-height:1.6">
+        Siga os passos abaixo para instalar o Finia na tela inicial do iPhone:
+      </div>
+      <div style="background:var(--s2);border-radius:14px;padding:4px 14px">
+        <div class="install-step">
+          <div class="install-step-num">1</div>
+          <div class="install-step-body">
+            <div class="install-step-title">Toque no botão Compartilhar</div>
+            <div class="install-step-sub">Na barra inferior do Safari, toque no ícone de compartilhar</div>
+            <div class="install-step-img">⬆️</div>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">2</div>
+          <div class="install-step-body">
+            <div class="install-step-title">Toque em "Adicionar à Tela de Início"</div>
+            <div class="install-step-sub">Role o menu para baixo até encontrar essa opção</div>
+            <div class="install-step-img">➕</div>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">3</div>
+          <div class="install-step-body">
+            <div class="install-step-title">Confirme tocando em "Adicionar"</div>
+            <div class="install-step-sub">O ícone do Finia aparecerá na sua tela inicial</div>
+            <div class="install-step-img">🏠</div>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // iOS mas não Safari (Chrome iOS, Firefox iOS)
+  if(env.isIOS){
+    el.innerHTML = `
+      <div style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;color:var(--am);margin-bottom:4px">⚠️ Abra no Safari</div>
+        <div style="font-size:12px;color:var(--mu);line-height:1.6">
+          No iPhone, a instalação de apps só funciona pelo Safari. Copie o link e abra no Safari para instalar.
+        </div>
+      </div>
+      <button class="install-btn" style="background:linear-gradient(135deg,#f59e0b,#d97706)" onclick="copiarLink()">
+        <span style="font-size:18px">🔗</span> Copiar link para abrir no Safari
+      </button>`;
+    return;
+  }
+
+  // Android sem Chrome (Firefox, Samsung Internet, etc.)
+  if(env.isAndroid){
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--mu);margin-bottom:14px;line-height:1.6">
+        Para instalar, siga os passos no seu browser:
+      </div>
+      <div style="background:var(--s2);border-radius:14px;padding:4px 14px">
+        <div class="install-step">
+          <div class="install-step-num">1</div>
+          <div class="install-step-body">
+            <div class="install-step-title">Abra o menu do browser</div>
+            <div class="install-step-sub">Toque nos 3 pontos no canto superior direito</div>
+            <div class="install-step-img">⋮</div>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">2</div>
+          <div class="install-step-body">
+            <div class="install-step-title">Toque em "Instalar app" ou "Adicionar à tela inicial"</div>
+            <div class="install-step-sub">A opção pode variar conforme o browser</div>
+            <div class="install-step-img">📲</div>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Desktop (Chrome, Edge, Firefox)
+  if(_installPrompt || env.isChrome || env.isEdge){
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--mu);margin-bottom:12px;line-height:1.6">
+        No computador, você pode instalar o Finia como um app de desktop.
+      </div>
+      ${_installPrompt ? `
+      <button class="install-btn" onclick="instalarPWA()">
+        <span style="font-size:18px">💻</span> Instalar no computador
+      </button>` : `
+      <div style="background:var(--s2);border-radius:12px;padding:12px 14px;font-size:12px;color:var(--mu);line-height:1.6">
+        Clique no ícone de instalação <strong style="color:var(--tx)">⊕</strong> na barra de endereço do Chrome/Edge para instalar.
+      </div>`}`;
+    return;
+  }
+
+  // Fallback genérico
+  el.innerHTML = `
+    <div style="font-size:12px;color:var(--mu);line-height:1.6">
+      Para instalar, acesse o menu do seu browser e procure por "Adicionar à tela inicial" ou "Instalar app".
+    </div>`;
+}
+
+// Disparar a instalação nativa (Android/Chrome/Edge)
+async function instalarPWA(){
+  if(!_installPrompt){ showToast('Instalação não disponível agora. Tente pelo menu do browser.'); return; }
+  _installPrompt.prompt();
+  const { outcome } = await _installPrompt.userChoice;
+  if(outcome === 'accepted'){
+    _installPrompt = null;
+    showToast('Instalando o Finia... 🎉');
+  }
+}
+
+// Copiar URL — funciona em iOS Chrome e Safari
+function copiarLink(){
+  const url = (typeof APP_URL !== "undefined" && !APP_URL.includes("COLE_AQUI")) ? APP_URL : window.location.href;
+
+  // Criar modal com input nativo (iOS consegue selecionar e copiar)
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:#1e293b;border-radius:24px 24px 0 0;padding:28px 24px 48px;width:100%;max-width:430px;border-top:1px solid #334155">
+      <div style="width:36px;height:4px;background:#334155;border-radius:2px;margin:0 auto 20px"></div>
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:6px">Copiar link do Finia</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:16px;line-height:1.6">
+        Toque no link abaixo, selecione tudo e copie. Depois abra o Safari e cole na barra de endereço.
+      </div>
+      <input id="_urlInput" type="url" readonly
+        value="${url}"
+        style="width:100%;background:#0f172a;border:1.5px solid #6366f1;border-radius:12px;padding:14px 12px;color:#a78bfa;font-size:12px;font-family:'DM Mono',monospace;outline:none;-webkit-user-select:all;user-select:all;margin-bottom:8px">
+      <div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:20px">
+        Toque no campo → Selecionar tudo → Copiar
+      </div>
+      <button id="_btnCopiar"
+        style="width:100%;padding:15px;border-radius:14px;border:none;background:linear-gradient(135deg,#6366f1,#a78bfa);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:10px">
+        📋 Copiar link
+      </button>
+      <button onclick="this.closest('div[style*=fixed]').remove()"
+        style="width:100%;padding:12px;border-radius:14px;border:1.5px solid #334155;background:transparent;color:#64748b;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+        Fechar
+      </button>
+    </div>`;
+  modal.onclick = (e) => { if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
+
+  // Selecionar o input automaticamente ao abrir
+  const inp = document.getElementById('_urlInput');
+  setTimeout(()=>{
+    inp.focus();
+    inp.setSelectionRange(0, inp.value.length);
+  }, 150);
+
+  // Botão copiar — tenta clipboard, fallback visual
+  document.getElementById('_btnCopiar').addEventListener('click', ()=>{
+    inp.focus();
+    inp.setSelectionRange(0, inp.value.length);
+
+    // Tentar clipboard API
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url)
+        .then(()=>{
+          document.getElementById('_btnCopiar').textContent = '✓ Copiado!';
+          document.getElementById('_btnCopiar').style.background = 'var(--gr)';
+          document.getElementById('_btnCopiar').style.color = '#0f172a';
+          setTimeout(()=>{ modal.remove(); showToast('Link copiado! Abra o Safari e cole ✓'); }, 800);
+        })
+        .catch(()=>{
+          // iOS bloqueou — usar execCommand como último recurso
+          try {
+            document.execCommand('copy');
+            document.getElementById('_btnCopiar').textContent = '✓ Copiado!';
+            setTimeout(()=>{ modal.remove(); showToast('Link copiado! Abra o Safari e cole ✓'); }, 800);
+          } catch(e2){
+            // Nada funcionou — pedir para copiar manualmente
+            document.getElementById('_btnCopiar').textContent = 'Segure o campo e copie';
+            document.getElementById('_btnCopiar').style.background = '#f59e0b';
+          }
+        });
+    } else {
+      // Sem clipboard API — tentar execCommand
+      try {
+        document.execCommand('copy');
+        document.getElementById('_btnCopiar').textContent = '✓ Copiado!';
+        setTimeout(()=>{ modal.remove(); showToast('Link copiado! Abra o Safari e cole ✓'); }, 800);
+      } catch(e){
+        document.getElementById('_btnCopiar').textContent = 'Segure o campo e copie';
+      }
+    }
+  });
+}
+
+// renderInstallSection chamado dentro de navTo
+</script>
+</body>
+</html>
