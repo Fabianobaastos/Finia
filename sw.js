@@ -18,9 +18,15 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// ── FETCH (cache-first para o HTML, network-first para o resto) ───────────────
+// ── FETCH ────────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // Ignorar requisições não-HTTP (blob:, data:, chrome-extension:, etc.)
+  if(!url.protocol.startsWith('http')) return;
+
+  // Ignorar requisições de outros domínios (API Anthropic, etc.)
+  if(url.origin !== self.location.origin) return;
 
   // Interceptar share target — POST para /share-comprovante
   if(url.pathname === '/share-comprovante' && e.request.method === 'POST'){
@@ -28,8 +34,12 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  // Ignorar requisições POST (uploads de arquivo, etc.)
+  if(e.request.method !== 'GET') return;
+
+  // Cache-first para GET
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    caches.match(e.request).then(r => r || fetch(e.request).catch(()=>{}))
   );
 });
 
@@ -37,15 +47,13 @@ self.addEventListener('fetch', e => {
 async function handleShare(request){
   try {
     const formData = await request.formData();
-    const file = formData.get('comprovante'); // nome definido no manifest
+    const file = formData.get('comprovante');
 
     if(file){
-      // Converter arquivo para base64 e armazenar no cache temporário
       const arrayBuffer = await file.arrayBuffer();
       const base64 = btoa(
         new Uint8Array(arrayBuffer).reduce((d, b) => d + String.fromCharCode(b), '')
       );
-      // Notificar a janela ativa via postMessage
       const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       if(clients.length > 0){
         clients[0].postMessage({
@@ -54,7 +62,6 @@ async function handleShare(request){
         });
         clients[0].focus();
       } else {
-        // App não estava aberto — salvar no cache para ler ao abrir
         const cache = await caches.open(CACHE);
         await cache.put('/__share_pending', new Response(JSON.stringify({
           base64, mediaType: file.type, name: file.name
@@ -65,6 +72,5 @@ async function handleShare(request){
     console.error('Share handler error:', err);
   }
 
-  // Redirecionar de volta para o app (aba Importar)
   return Response.redirect('/?tab=imp&share=1', 303);
 }
