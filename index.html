@@ -2209,6 +2209,13 @@ function rodarParser(){
 
   parsedItems = impTipo==='extrato' ? parsearExtrato(txt) : parsearFatura(txt);
 
+  if(parsedItems.length && isPro()){
+    resultFiltro = 'todos';
+    mostrarStep2(); // mostra imediatamente com categorias provisórias
+    recategorizarComIA(parsedItems); // melhora em background
+    return;
+  }
+
   if(!parsedItems.length){
     // Mostrar modal com texto extraído para diagnóstico
         const linhas = txt.split(/[\n\r]+/).filter(l=>l.trim()).length;
@@ -2758,6 +2765,108 @@ function parsearFatura(txt){
 
   // Filtrar conforme portador selecionado
   return filtro==='todos' ? items : items.filter(i=>i._sel);
+}
+
+// ── RECATEGORIZAÇÃO POR IA (lote, pós-import) ────────────────────────────────
+async function recategorizarComIA(items){
+  // Só para usuários Pro com IA disponível
+  if(!isPro()) return;
+
+  // Badge de progresso — aparece no cabeçalho do step2
+  const sub = document.getElementById('iResSub');
+  let badge = document.getElementById('_ia-cat-badge');
+  if(!badge && sub){
+    badge = document.createElement('span');
+    badge.id = '_ia-cat-badge';
+    badge.style.cssText = 'background:rgba(99,102,241,.15);color:#a78bfa;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;margin-left:6px';
+    badge.textContent = '✨ Categorizando...';
+    sub.appendChild(badge);
+  }
+
+  try {
+    const cats = DB.categorias.map(c => c.nome).join(', ');
+
+    // Histórico de categorizações do usuário para aprendizado contextual
+    const exemplos = Object.values(DB.lancamentos).flat()
+      .filter(l => l.desc && l.catId)
+      .slice(-40)
+      .map(l => {
+        const cat = DB.categorias.find(c => c.id === l.catId);
+        return `"${l.desc}" → ${cat?.nome || 'Outros'}`;
+      }).join('\n');
+
+    // Montar lista compacta de lançamentos para a IA
+    const lista = items.map((it, i) =>
+      `${i}|${it.tipo === 'rec' ? 'ENTRADA' : 'SAIDA'}|${it.desc}`
+    ).join('\n');
+
+    const prompt = `Você categoriza lançamentos financeiros brasileiros — tanto de pessoas físicas quanto de empresas (MEIs, PMEs).
+
+CATEGORIAS DISPONÍVEIS: ${cats}
+
+HISTÓRICO DE CATEGORIZAÇÕES DO USUÁRIO (aprenda o padrão):
+${exemplos || '(nenhum ainda)'}
+
+LANÇAMENTOS (formato: índice|tipo|descrição):
+${lista}
+
+REGRAS:
+- Retorne APENAS JSON válido: {"cats": {"0": "NomeCategoria", "1": "NomeCategoria", ...}}
+- Use EXATAMENTE o nome da categoria como fornecido acima
+- Para SAIDA de pessoa física: Mercado, Alimentação, Transporte, Moradia, Saúde, Assinaturas, Roupas, Educação, Lazer ou Outros gastos
+- Para SAIDA empresarial (ex: pagamento a colaborador, prestador, contabilidade, fornecedor, plataforma): use "Outros gastos" se não houver categoria específica — mas tente inferir pelo nome (CONTABILIDADE → Serviços, UBER → Transporte, etc.)
+- Para ENTRADA: Salário, Freelance, Investimentos ou Outros ganhos
+- PIX para pessoa física com nome completo e sem contexto adicional: "Outros gastos"
+- Nomes de contabilidade/assessoria: "Outros gastos" (ou categoria mais próxima disponível)
+- Nunca invente categorias fora da lista`;
+
+    const resposta = await chamarIA(
+      prompt,
+      'Você categoriza lançamentos financeiros. Retorne apenas JSON válido, sem markdown.',
+      800
+    );
+
+    const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    let resultado;
+    try { resultado = JSON.parse(json); }
+    catch {
+      const m = json.match(/\{[\s\S]*\}/);
+      if(m) resultado = JSON.parse(m[0]);
+      else throw new Error('JSON inválido');
+    }
+
+    const cats_map = resultado.cats || {};
+    let alterados = 0;
+
+    Object.entries(cats_map).forEach(([idxStr, nomeCategoria]) => {
+      const idx = parseInt(idxStr);
+      if(isNaN(idx) || !items[idx]) return;
+      const cat = DB.categorias.find(c =>
+        c.nome.toLowerCase() === nomeCategoria.toLowerCase()
+      );
+      if(cat && cat.id !== items[idx].catId){
+        items[idx].catId = cat.id;
+        alterados++;
+      }
+    });
+
+    // Atualizar a UI com as novas categorias
+    if(alterados > 0) renderImpResult();
+
+    if(badge){
+      badge.style.background = 'rgba(34,211,165,.12)';
+      badge.style.color = '#22d3a5';
+      badge.textContent = `✨ IA categorizou ${alterados} lançamento${alterados !== 1 ? 's' : ''}`;
+    }
+
+  } catch(err) {
+    console.warn('Recategorização IA falhou (usando autoCat):', err.message);
+    if(badge){
+      badge.style.background = 'rgba(251,191,36,.1)';
+      badge.style.color = '#fbbf24';
+      badge.textContent = '⚡ Categorias automáticas';
+    }
+  }
 }
 
 // ── AUTO-CATEGORIZAÇÃO ────────────────────────────────────────────────────────
