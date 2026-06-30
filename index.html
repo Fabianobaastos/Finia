@@ -569,9 +569,9 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       </div>
 
       <div style="display:flex;gap:8px">
-        <button class="btn-main" style="flex:1" onclick="rodarParser()">⚡ Analisar</button>
-        <button style="padding:12px 16px;border-radius:14px;border:1.5px solid #6366f1;background:rgba(99,102,241,.1);color:#a78bfa;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer" onclick="rodarParserIA()" title="IA — funciona com qualquer banco">✨ IA</button>
-        <button class="btn-ghost" style="padding:12px 14px;font-size:11px" onclick="verTextoExtraido()" title="Ver texto extraído">🔍</button>
+        <button id="btn-rodarParser" class="btn-main" style="flex:1" onclick="rodarParser()">⚡ Analisar</button>
+        <button id="btn-rodarParserIA" style="padding:12px 16px;border-radius:14px;border:1.5px solid #6366f1;background:rgba(99,102,241,.1);color:#a78bfa;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer" onclick="rodarParserIA()" title="IA — funciona com qualquer banco">✨ IA</button>
+        <button id="btn-verTextoExtraido" class="btn-ghost" style="padding:12px 14px;font-size:11px" onclick="verTextoExtraido()" title="Ver texto extraído">🔍</button>
       </div>
       <div style="margin-top:8px;font-size:10px;color:var(--mu);text-align:center">
         ✨ IA lê qualquer banco — Nubank, Bradesco, Inter, BB, Caixa, C6 e mais
@@ -683,7 +683,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <textarea id="iTextoRawFatura" placeholder="Cole o texto da fatura do cartão (PDF copiado)..." style="width:100%;min-height:120px;background:var(--s1);border:1.5px solid var(--bd);border-radius:14px;padding:14px;color:var(--tx);font-family:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
 
       <button class="btn-main" onclick="rodarParserFatura()">🔍 Analisar fatura</button>
-      <button class="btn-ghost" style="margin-top:10px" onclick="rodarParserFaturaIA()">✨ Analisar com IA (recomendado)</button>
+      <button class="btn-ghost" id="btn-rodarParserFaturaIA" style="margin-top:10px" onclick="rodarParserFaturaIA()">✨ Analisar com IA (recomendado)</button>
     </div>
 
     <!-- Revisão dos itens da fatura antes de confirmar -->
@@ -2269,8 +2269,8 @@ function selImpTipo(tipo){
   ta.style.display = '';
   const sep = ta.previousElementSibling;
   if(sep) sep.style.display = '';
-  ['rodarParser','rodarParserIA','verTextoExtraido'].forEach(fn=>{
-    const b = document.querySelector('[onclick*="'+fn+'"]');
+  ['btn-rodarParser','btn-rodarParserIA','btn-verTextoExtraido'].forEach(id=>{
+    const b = document.getElementById(id);
     if(b) b.style.display = '';
   });
   const dica = document.querySelector('#imp-step1 [style*="10px;color:var(--mu)"]');
@@ -3998,7 +3998,7 @@ async function rodarParserIA(){
 
   if(!isPro()){ showUpgradeModal('Importação inteligente com IA é exclusiva do plano Pro.\n\nEntende qualquer banco automaticamente.'); return; }
 
-  const btnIA = document.querySelector('button[onclick="rodarParserIA()"]');
+  const btnIA = document.getElementById('btn-rodarParserIA');
   if(btnIA){ btnIA.textContent='⏳ Analisando...'; btnIA.disabled=true; }
 
   const txtTrunc  = txt.length > 9000 ? txt.slice(0,9000)+'\n...(truncado)' : txt;
@@ -5349,12 +5349,23 @@ async function rodarParserFaturaIA(){
   if(!cartaoImpSelId){ showToast('Selecione um cartão'); return; }
   if(!isPro()){ showToast('Análise com IA é exclusiva do plano Pro ✨'); return; }
 
-  showToast('✨ Analisando fatura com IA...');
+  // Indicador de progresso persistente na tela (toast sozinho não é suficiente
+  // para um processo de vários blocos que pode levar 1-2 minutos)
+  const btnIA = document.getElementById('btn-rodarParserFaturaIA');
+  const statusEl = document.getElementById('fatura-ia-status') || (()=>{
+    const el = document.createElement('div');
+    el.id = 'fatura-ia-status';
+    el.style.cssText = 'margin-top:10px;padding:12px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:12px;font-size:12px;color:#a78bfa;text-align:center';
+    btnIA.parentElement.insertBefore(el, btnIA.nextSibling);
+    return el;
+  })();
+  statusEl.style.display = '';
+  statusEl.textContent = '✨ Preparando análise...';
+  if(btnIA){ btnIA.disabled = true; btnIA.style.opacity = '0.6'; }
+
   try {
     const cats = DB.categorias.filter(c=>c.tipo==='desp').map(c=>c.nome).join(', ');
 
-    // Extrair total oficial da fatura (mesmo mecanismo do parser tradicional)
-    // — usado depois para criar um lançamento de ajuste se necessário.
     let totalOficial = null;
     const padroesTotal = [
       /total\s+desta\s+fatura\s+r?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i,
@@ -5365,24 +5376,24 @@ async function rodarParserFaturaIA(){
     for(const padrao of padroesTotal){
       const m = padrao.exec(txt);
       if(m){
-        const valorStr = m[m.length-1]; // último grupo capturado é sempre o valor
+        const valorStr = m[m.length-1];
         totalOficial = parseFloat(valorStr.replace(/\./g,'').replace(',','.'));
         break;
       }
     }
 
-    // Processar em blocos — texto completo, sem cortar. Faturas longas
-    // (múltiplos portadores, várias páginas) precisam de vários lotes para
-    // não estourar o limite de tokens de saída da IA.
-    const TAMANHO_BLOCO = 8000; // caracteres de texto da fatura por chamada
+    // Blocos menores (5000 chars) = respostas mais rápidas por chamada,
+    // ainda cobrindo faturas longas com múltiplos portadores.
+    const TAMANHO_BLOCO = 5000;
     const blocos = [];
     for(let i=0; i<txt.length; i+=TAMANHO_BLOCO){
       blocos.push(txt.slice(i, i+TAMANHO_BLOCO));
     }
 
     let todosItens = [];
+    let blocosComErro = 0;
     for(let i=0; i<blocos.length; i++){
-      if(blocos.length > 1) showToast(`✨ Analisando parte ${i+1}/${blocos.length}...`);
+      statusEl.textContent = `✨ Analisando parte ${i+1} de ${blocos.length}...`;
 
       const prompt = `Extraia TODOS os lançamentos de compra/saque desta PARTE de uma fatura de cartão de crédito brasileira (pode haver múltiplos portadores/cartões adicionais — extraia de todos).
 
@@ -5403,7 +5414,7 @@ REGRAS IMPORTANTES:
 - Esta é apenas uma PARTE do documento — pode haver lançamentos cortados no início ou fim deste trecho; ignore linhas incompletas que não tenham data+valor claros`;
 
       try {
-        const resposta = await chamarIA(prompt, 'Você extrai lançamentos de faturas de cartão de crédito brasileiras de qualquer banco. Retorne apenas JSON válido, sem markdown.', 4000);
+        const resposta = await chamarIA(prompt, 'Você extrai lançamentos de faturas de cartão de crédito brasileiras de qualquer banco. Retorne apenas JSON válido, sem markdown.', 3500);
         const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
         let dados;
         try { dados = JSON.parse(json); }
@@ -5411,8 +5422,13 @@ REGRAS IMPORTANTES:
         todosItens = todosItens.concat(dados.itens || []);
       } catch(errBloco){
         console.warn('Erro no bloco '+(i+1)+':', errBloco.message);
-        // Continua processando os outros blocos mesmo se um falhar
+        blocosComErro++;
+        statusEl.textContent = `⚠️ Parte ${i+1} falhou, continuando...`;
       }
+    }
+
+    if(blocosComErro === blocos.length){
+      throw new Error('Todas as partes falharam. Verifique sua conexão e tente novamente.');
     }
 
     parsedItemsFatura = todosItens.map(it=>{
@@ -5464,9 +5480,14 @@ REGRAS IMPORTANTES:
       return;
     }
 
+    statusEl.textContent = `✅ ${parsedItemsFatura.length} lançamentos encontrados!`;
     abrirRevisaoFatura();
   } catch(err){
+    statusEl.textContent = '❌ ' + err.message.slice(0,80);
     showToast('Erro ao analisar fatura: '+err.message.slice(0,50));
+  } finally {
+    if(btnIA){ btnIA.disabled = false; btnIA.style.opacity = '1'; }
+    setTimeout(()=>{ if(statusEl) statusEl.style.display = 'none'; }, 4000);
   }
 }
 
