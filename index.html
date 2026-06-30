@@ -776,6 +776,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
 
+      <!-- Diagnóstico do parser — só aparece se houver registros -->
+      <div class="cfg-section" id="cfg-diagnostico-section" style="display:none">
+        <div class="section-title">Diagnóstico</div>
+        <div class="cfg-item" onclick="exportarDivergenciasParser()" style="cursor:pointer">
+          <div>
+            <div class="cfg-label">📊 Divergências do importador</div>
+            <div class="cfg-sub" id="cfg-diagnostico-sub">—</div>
+          </div>
+          <div class="cfg-arrow">›</div>
+        </div>
+      </div>
+
       <div class="cfg-section">
         <div class="section-title">Categorias</div>
         <div id="cats-list-cfg"></div>
@@ -4222,6 +4234,7 @@ function detectarAmbiente(){
 // Renderizar a seção de instalação na configuração
 function renderInstallSection(){
   const el = document.getElementById('cfg-instalar-content');
+  if(el) renderDiagnosticoSection();
   if(!el) return;
 
   const env = detectarAmbiente();
@@ -5331,7 +5344,99 @@ function rodarParserFatura(){
   window._cartaoFiltroPortadorOverride = filtroEl ? filtroEl.value : 'todos';
 
   parsedItemsFatura = parsearFaturaParaCartao(txt);
+  registrarDivergenciaParser(parsedItemsFatura, txt);
   abrirRevisaoFatura();
+}
+
+function renderDiagnosticoSection(){
+  const secao = document.getElementById('cfg-diagnostico-section');
+  const sub = document.getElementById('cfg-diagnostico-sub');
+  if(!secao || !sub) return;
+  let registros = [];
+  try { registros = JSON.parse(localStorage.getItem('finia_divergencias_parser') || '[]'); } catch{}
+  if(registros.length > 0){
+    secao.style.display = '';
+    sub.textContent = `${registros.length} registro${registros.length!==1?'s':''} · toque para copiar`;
+  } else {
+    secao.style.display = 'none';
+  }
+}
+
+// ── REGISTRO DE DIVERGÊNCIAS DO PARSER ───────────────────────────────────────
+// Sempre que o parser tradicional cria um "ajuste de fatura" relevante,
+// guardamos um registro local (anônimo, sem dados pessoais do usuário) para
+// análise posterior — ajuda a identificar padrões recorrentes de bancos/
+// layouts que o parser ainda não cobre bem, sem depender de feedback manual.
+function registrarDivergenciaParser(items, txtOriginal){
+  try {
+    const ajuste = items.find(it => it.desc === 'Outros (ajuste de fatura)');
+    if(!ajuste) return; // sem divergência relevante — nada a registrar
+
+    const totalCapturado = items
+      .filter(it => it.desc !== 'Outros (ajuste de fatura)')
+      .reduce((s,it)=>s+it.valor, 0);
+    const totalOficialMatch = ajuste.nota.match(/R\$\s*([\d.,]+)/);
+    const totalOficial = totalOficialMatch
+      ? parseFloat(totalOficialMatch[1].replace(/\./g,'').replace(',','.'))
+      : null;
+
+    // Detectar o banco a partir de marcadores comuns no texto (sem guardar
+    // nenhum dado pessoal — só o nome do banco/bandeira para classificação)
+    let bancoDetectado = 'desconhecido';
+    if(/itaú|itau/i.test(txtOriginal)) bancoDetectado = 'Itaú';
+    else if(/nubank/i.test(txtOriginal)) bancoDetectado = 'Nubank';
+    else if(/bradesco/i.test(txtOriginal)) bancoDetectado = 'Bradesco';
+    else if(/santander/i.test(txtOriginal)) bancoDetectado = 'Santander';
+    else if(/banco inter|bancointer/i.test(txtOriginal)) bancoDetectado = 'Inter';
+    else if(/\bc6\b/i.test(txtOriginal)) bancoDetectado = 'C6';
+    else if(/caixa econômica/i.test(txtOriginal)) bancoDetectado = 'Caixa';
+    else if(/banco do brasil/i.test(txtOriginal)) bancoDetectado = 'BB';
+
+    const percentDivergencia = totalOficial
+      ? Math.abs(ajuste.valor) / totalOficial * 100
+      : null;
+
+    const registro = {
+      timestamp: new Date().toISOString(),
+      banco: bancoDetectado,
+      totalOficial,
+      totalCapturado,
+      valorAjuste: ajuste.valor,
+      percentDivergencia: percentDivergencia ? Math.round(percentDivergencia * 100) / 100 : null,
+      qtdItensCapturados: items.length - 1, // -1 para excluir o próprio ajuste
+      tamanhoTexto: txtOriginal.length
+    };
+
+    // Guardar em localStorage — lista cumulativa, limitada a 100 registros
+    // mais recentes para não crescer indefinidamente.
+    const KEY = 'finia_divergencias_parser';
+    let registros = [];
+    try { registros = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch{}
+    registros.push(registro);
+    if(registros.length > 100) registros = registros.slice(-100);
+    localStorage.setItem(KEY, JSON.stringify(registros));
+
+    console.log('📊 Divergência registrada:', registro);
+  } catch(err){
+    console.warn('Erro ao registrar divergência:', err.message);
+  }
+}
+
+// Função utilitária para o usuário/dev exportar os registros acumulados
+// (pode ser chamada manualmente no console, ou exposta numa tela de config)
+function exportarDivergenciasParser(){
+  const registros = JSON.parse(localStorage.getItem('finia_divergencias_parser') || '[]');
+  if(!registros.length){
+    showToast('Nenhuma divergência registrada ainda.');
+    return;
+  }
+  const texto = JSON.stringify(registros, null, 2);
+  navigator.clipboard?.writeText(texto).then(()=>{
+    showToast(`📋 ${registros.length} registros copiados!`);
+  }).catch(()=>{
+    console.log(texto);
+    showToast('Veja o console para os registros.');
+  });
 }
 
 function parsearFaturaParaCartao(txt){
@@ -5382,9 +5487,10 @@ async function rodarParserFaturaIA(){
       }
     }
 
-    // Blocos menores (5000 chars) = respostas mais rápidas por chamada,
-    // ainda cobrindo faturas longas com múltiplos portadores.
-    const TAMANHO_BLOCO = 5000;
+    // Blocos pequenos (2500 chars) — Netlify Functions no plano gratuito têm
+    // timeout de ~10s, e blocos grandes com muito texto + resposta longa da IA
+    // facilmente excedem isso, fazendo o bloco falhar silenciosamente.
+    const TAMANHO_BLOCO = 2500;
     const blocos = [];
     for(let i=0; i<txt.length; i+=TAMANHO_BLOCO){
       blocos.push(txt.slice(i, i+TAMANHO_BLOCO));
@@ -5413,19 +5519,28 @@ REGRAS IMPORTANTES:
 - Se não conseguir identificar a categoria, use "Outros gastos"
 - Esta é apenas uma PARTE do documento — pode haver lançamentos cortados no início ou fim deste trecho; ignore linhas incompletas que não tenham data+valor claros`;
 
-      try {
-        const resposta = await chamarIA(prompt, 'Você extrai lançamentos de faturas de cartão de crédito brasileiras de qualquer banco. Retorne apenas JSON válido, sem markdown.', 3500);
-        const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-        let dados;
-        try { dados = JSON.parse(json); }
-        catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
-        const itensBloco = dados.itens || [];
-        todosItens = todosItens.concat(itensBloco);
-        console.log(`Bloco ${i+1}/${blocos.length}: ${itensBloco.length} itens, soma R$ ${itensBloco.reduce((s,it)=>s+(it.valor||0),0).toFixed(2)}`);
-      } catch(errBloco){
-        console.warn('Erro no bloco '+(i+1)+':', errBloco.message);
-        blocosComErro++;
-        statusEl.textContent = `⚠️ Parte ${i+1} falhou, continuando...`;
+      // Retry automático — se a chamada falhar (ex: timeout da função serverless),
+      // tenta de novo até 2 vezes antes de desistir desse bloco.
+      let sucesso = false;
+      for(let tentativa=1; tentativa<=3 && !sucesso; tentativa++){
+        try {
+          if(tentativa > 1) statusEl.textContent = `✨ Parte ${i+1}/${blocos.length} (tentativa ${tentativa})...`;
+          const resposta = await chamarIA(prompt, 'Você extrai lançamentos de faturas de cartão de crédito brasileiras de qualquer banco. Retorne apenas JSON válido, sem markdown.', 2000);
+          const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+          let dados;
+          try { dados = JSON.parse(json); }
+          catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
+          const itensBloco = dados.itens || [];
+          todosItens = todosItens.concat(itensBloco);
+          console.log(`Bloco ${i+1}/${blocos.length} (tentativa ${tentativa}): ${itensBloco.length} itens, soma R$ ${itensBloco.reduce((s,it)=>s+(it.valor||0),0).toFixed(2)}`);
+          sucesso = true;
+        } catch(errBloco){
+          console.warn(`Erro no bloco ${i+1} (tentativa ${tentativa}):`, errBloco.message);
+          if(tentativa === 3){
+            blocosComErro++;
+            statusEl.textContent = `⚠️ Parte ${i+1} falhou após 3 tentativas, continuando...`;
+          }
+        }
       }
     }
 
