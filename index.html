@@ -3039,18 +3039,31 @@ function parsearFatura(txt){
     });
   }
 
-  // ── DEDUPLICAÇÃO ────────────────────────────────────────────────────────────
-  // Alguns itens podem aparecer tanto na extração internacional quanto na
-  // nacional (linhas de fronteira entre as duas seções, comum em faturas com
-  // muitos portadores). Removemos duplicatas exatas por data+valor+descrição
-  // (ignorando o sufixo " (internacional)"), mantendo a primeira ocorrência.
-  const vistos = new Set();
-  const itemsSemDuplicata = [];
-  for(const it of items){
+  // ── DEDUPLICAÇÃO (apenas cruzamento internacional × nacional) ────────────────
+  // Alguns itens aparecem tanto na extração internacional quanto na nacional
+  // (linhas de fronteira entre as duas seções). Só removemos quando EXISTE
+  // a mesma data+valor+descrição em AMBAS as origens — nunca removemos
+  // repetições legítimas dentro da mesma origem (ex: várias corridas de
+  // patinete no mesmo dia com valor igual são compras reais, não duplicatas).
+  const chaveDe = (it) => {
     const descBase = it.desc.replace(/\s*\(internacional\)\s*$/i, '').trim().toLowerCase();
-    const chave = `${it.data}|${descBase}|${it.valor.toFixed(2)}`;
-    if(vistos.has(chave)) continue;
-    vistos.add(chave);
+    return `${it.data}|${descBase}|${it.valor.toFixed(2)}`;
+  };
+  const itensIntlPorChave = new Set(
+    items.filter(i => /\(internacional\)\s*$/i.test(i.desc)).map(chaveDe)
+  );
+  const itemsSemDuplicata = [];
+  const jaRemovidoIntl = new Set();
+  for(const it of items){
+    const isIntl = /\(internacional\)\s*$/i.test(it.desc);
+    const chave  = chaveDe(it);
+    if(!isIntl && itensIntlPorChave.has(chave)){
+      // Item nacional que tem equivalente internacional — manter só a versão
+      // internacional (já adicionada antes neste array) e descartar a nacional.
+      continue;
+    }
+    if(isIntl && jaRemovidoIntl.has(chave)) continue; // evitar 2x a versão intl
+    if(isIntl) jaRemovidoIntl.add(chave);
     itemsSemDuplicata.push(it);
   }
 
