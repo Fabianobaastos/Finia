@@ -2886,6 +2886,30 @@ function parsearFatura(txt){
   const items  = [];
   const filtro = getCartaoFiltro();
 
+  // ── TOTAL OFICIAL DA FATURA ──────────────────────────────────────────────────
+  // Tentamos extrair o valor total declarado pelo banco, em ordem de confiança.
+  // Isso serve para gerar um lançamento de ajuste no final, garantindo que o
+  // valor total importado bata exatamente com a fatura — mesmo que o parser
+  // não tenha capturado 100% dos lançamentos individuais (parcelamentos
+  // internacionais, formatos exóticos, etc.)
+  let totalOficial = null;
+  const padroesTotal = [
+    /total\s+desta\s+fatura\s+(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+    /o\s+total\s+da\s+sua\s+fatura\s+é:?\s*r?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+    /total\s+dos\s+lançamentos\s+atuais\s+(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+    /valor\s+total\s+da\s+fatura\s*:?\s*r?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+  ];
+  for(const padrao of padroesTotal){
+    for(const l of lines){
+      const m = padrao.exec(l);
+      if(m){
+        totalOficial = parseFloat(m[1].replace(/\./g,'').replace(',','.'));
+        break;
+      }
+    }
+    if(totalOficial !== null) break;
+  }
+
   // ── Detectores ─────────────────────────────────────────────────────────────
   // Parar antes de parcelamentos futuros
   const reParar = /Compras parceladas.*próximas|Total dos lançamentos|próximas faturas/i;
@@ -2906,7 +2930,10 @@ function parsearFatura(txt){
   const reCat = /^(ALIMENTA[ÇC]|TURISMO|DIVERSOS|SA[ÚU]DE|VESTU[ÁA]RIO|VE[ÍI]CULOS|MORADIA|EDUCA[ÇC]|HOBBY|OUTROS|SAO |SAN |LONDON|ZURICH|MOUNTAIN|CURITIBA|FLORIANOPOLIS|PALHOCA|OSASCO|BELO|BRASILIA|Palhoca|Palhoa|Osasco|Sao Paulo|Barueri|Contagem|Alexandria|Curitiba|Rio do Sul)/i;
 
   // Linhas de cabeçalho/rodapé a ignorar
-  const reIgnorar = /^(data$|estabelecimento$|valor em r\$|continua\.|PC\s*-|4004|0800|postagem|vencimento|emissão|o total|com vencimento|pagamento\s+(efetuado|mínimo|obrigatório)|parcelas fixas|juros|iof|cet|banco|número do|nome do|endereço|instruções|local de|sacador|data do|uso do|espécie|aceite|nosso número|total desta|saldo financ|total da fatura|previsão|repasse de iof|total lanç|lançamentos produtos|total dos lanç|compras parceladas|próxima fatura|demais faturas|total para próximas|limites de créd|limite total|limite disp|limite máx|encargos cobrados|juros do rot|juros de mora|multa|novo teto|simulação|valor compra|valor do iof|valor total fin|valor juros|quantidade|valor da parc|valor total a pagar|de retirada|de pagamento|dólar de conv|total transaç|lançamentos inter|lançamentos no cartão|anuidade|estorno de anuidade|titular\s+\d)/i;
+  const reIgnorar = /^(data$|estabelecimento$|valor em r\$|continua\.|PC\s*-|4004|0800|postagem|vencimento|emissão|o total|com vencimento|pagamento\s+(efetuado|mínimo|obrigatório)|parcelas fixas|juros|iof|cet|banco|número do|nome do|endereço|instruções|local de|sacador|data do|uso do|espécie|aceite|nosso número|total desta|saldo financ|total da fatura|previsão|repasse de iof|total lanç|lançamentos produtos|total dos lanç|compras parceladas|próxima fatura|demais faturas|total para próximas|limites de créd|limite total|limite disp|limite máx|encargos cobrados|juros do rot|juros de mora|multa|novo teto|simulação|valor compra|valor do iof|valor total fin|valor juros|quantidade|valor da parc|valor total a pagar|de retirada|de pagamento|dólar de conv|total transaç|lançamentos inter|lançamentos no cartão|titular\s+\d)/i;
+  // Anuidade (cobrança) e seu estorno se anulam — ignoramos ambos onde quer
+  // que apareçam na linha (não exigir início, pois vem após "DD/MM ").
+  const reIgnorarAnuidade = /anuidade/i;
 
   // ── LANÇAMENTOS INTERNACIONAIS ────────────────────────────────────────────
   // Na fatura Itaú, essa seção vem misturada em colunas com "Compras parceladas"
@@ -2985,6 +3012,7 @@ function parsearFatura(txt){
 
     // Ignorar cabeçalhos/rodapés — ANTES de tudo
     if(reIgnorar.test(l)) continue;
+    if(reIgnorarAnuidade.test(l)) continue;
 
     // Total de seção → resetar portador (e ignorar esta linha)
     if(reTotalSec.test(l)){ secao='desconhecido'; continue; }
@@ -3065,6 +3093,36 @@ function parsearFatura(txt){
     if(isIntl && jaRemovidoIntl.has(chave)) continue; // evitar 2x a versão intl
     if(isIntl) jaRemovidoIntl.add(chave);
     itemsSemDuplicata.push(it);
+  }
+
+  // ── LANÇAMENTO DE AJUSTE ──────────────────────────────────────────────────────
+  // Se conseguimos identificar o total oficial da fatura e ele difere do que
+  // capturamos, criamos um item "Outros (ajuste de fatura)" com a diferença,
+  // garantindo que o total importado bata exatamente com a fatura real.
+  // Só faz sentido aplicar isso quando filtro==='todos' (sem filtrar portador).
+  if(totalOficial !== null && filtro === 'todos'){
+    const totalCapturado = itemsSemDuplicata.reduce((s,it)=>s+it.valor, 0);
+    const diferenca = totalOficial - totalCapturado;
+    // Só criar ajuste se a diferença for relevante (> 1 centavo) e não absurda
+    // (> 50% do total, o que indicaria erro grave, não apenas itens perdidos)
+    if(Math.abs(diferenca) > 0.01 && Math.abs(diferenca) < totalOficial * 0.5){
+      const catOutros = (typeof DB !== 'undefined' && DB.categorias)
+        ? DB.categorias.find(c=>c.nome==='Outros gastos')
+        : null;
+      const hoje = new Date();
+      const dataAjuste = `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`;
+      itemsSemDuplicata.push({
+        data: dataAjuste,
+        desc: 'Outros (ajuste de fatura)',
+        valor: Math.abs(diferenca),
+        tipo: 'desp',
+        catId: catOutros ? catOutros.id : (typeof autoCat === 'function' ? autoCat('Outros', 'desp') : 'cOutros'),
+        parcAtual: 1,
+        parcTotal: 1,
+        nota: `Ajuste automático para bater com o total oficial da fatura (R$ ${totalOficial.toFixed(2)})`,
+        _sel: true
+      });
+    }
   }
 
   // Filtrar conforme portador selecionado
