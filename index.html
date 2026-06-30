@@ -21,21 +21,21 @@
 <style>
 /* ── TOKENS ─────────────────────────────────────────────────────────────── */
 :root{
-  --bg:   #0f172a;
-  --s1:   #1e293b;
-  --s2:   #253347;
-  --bd:   #334155;
-  --mu:   #64748b;
-  --tx:   #f1f5f9;
-  --ts:   #cbd5e1;
-  --gr:   #22d3a5;
+  --bg:   #12182b;
+  --s1:   #1c2438;
+  --s2:   #28324a;
+  --bd:   #38445e;
+  --mu:   #8593ab;
+  --tx:   #f4f7fb;
+  --ts:   #d3dbe8;
+  --gr:   #2dd98f;
   --gr2:  #16a37e;
-  --rd:   #f87171;
-  --am:   #fbbf24;
-  --bl:   #6366f1;
+  --rd:   #ff7a7a;
+  --am:   #ffc24b;
+  --bl:   #5b8def;
   --bl2:  #4f46e5;
   --pu:   #a78bfa;
-  --card-r: 16px;
+  --card-r: 18px;
   --safe-b: env(safe-area-inset-bottom, 0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -458,6 +458,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <!-- ── TAB: INÍCIO ─────────────────────────────────────────────────── -->
   <div class="tab-content active page" id="tab-inicio">
     <div id="hero-wrap"></div>
+    <div id="resumo-simples-wrap"></div>
+    <div id="orcamento-wrap"></div>
     <div id="uso-wrap"></div>
     <div id="insight-ai-wrap"></div>
     <div id="kpis-wrap"></div>
@@ -1581,22 +1583,24 @@ function renderInicio(){
   const txEcon = rec>0 ? Math.max(0,(sal/rec)*100) : 0;
 
   const usoWrap = document.getElementById('uso-wrap'); if(usoWrap) usoWrap.innerHTML = usoHtml;
+  renderResumoSimples(ym, rec, desp, sal, lancs);
+  renderOrcamento(ym, desp);
   document.getElementById('kpis-wrap').innerHTML=`
     <div class="kpi-grid">
-      <div class="kpi">
+      <div class="kpi" onclick="abrirPainelDividas()" style="cursor:pointer">
         <div class="kpi-icon">📦</div>
-        <div class="kpi-label">Parcelas ativas</div>
+        <div class="kpi-label">Parcelas ativas ›</div>
         <div class="kpi-value" style="color:var(--am)">${fmtV(totalParc)}</div>
       </div>
       <div class="kpi">
         <div class="kpi-icon">🏆</div>
-        <div class="kpi-label">Maior gasto</div>
+        <div class="kpi-label">Onde gastou mais</div>
         <div class="kpi-value" style="font-size:13px">${topCat}</div>
       </div>
       <div class="kpi">
-        <div class="kpi-icon">💾</div>
-        <div class="kpi-label">Taxa de economia</div>
-        <div class="kpi-value" style="color:${txEcon>=20?'var(--gr)':'var(--rd)'}">${txEcon.toFixed(0)}%</div>
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-label">${sal>=0?'Sobrou esse mês':'Faltou esse mês'}</div>
+        <div class="kpi-value" style="color:${sal>=0?'var(--gr)':'var(--rd)'}">${fmtV(Math.abs(sal))}</div>
       </div>
       <div class="kpi">
         <div class="kpi-icon">🧾</div>
@@ -1626,6 +1630,247 @@ function renderInicio(){
         </div>`;
       }).join('')+'</div>'
     : '<div class="empty" style="padding:20px"><div class="empty-icon">📊</div><div class="empty-sub">Adicione lançamentos para ver seus gastos por categoria.</div></div>';
+}
+
+// ── RESUMO EM LINGUAGEM SIMPLES ───────────────────────────────────────────────
+// Traduz os números do mês em uma frase humana e acolhedora, sem jargão.
+// Foco nas prioridades do usuário: (1) para onde foi o dinheiro, (2) parcelas,
+// (3) não estourar o orçamento, (4) hábito de guardar.
+function renderResumoSimples(ym, rec, desp, sal, lancs){
+  const wrap = document.getElementById('resumo-simples-wrap');
+  if(!wrap) return;
+
+  const despLancs = lancs.filter(l=>l.tipo==='desp');
+  // Sem dados suficientes ainda — mensagem de boas-vindas em vez de resumo
+  if(despLancs.length === 0){
+    wrap.innerHTML = `
+      <div style="background:linear-gradient(135deg,rgba(45,217,143,.1),rgba(91,141,239,.06));border:1px solid rgba(45,217,143,.2);border-radius:16px;padding:16px;margin-bottom:12px">
+        <div style="font-size:13px;color:var(--ts);line-height:1.6">
+          👋 <strong style="color:var(--tx)">Vamos começar!</strong> Adicione seus gastos no botão ＋ ou importe um extrato. Aqui você vai ver, em palavras simples, para onde seu dinheiro está indo.
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Maior categoria de gasto do mês — ignorando "pagamento de fatura de cartão",
+  // que não é um gasto acionável (o gasto real está nas categorias do cartão).
+  const catMap = {};
+  despLancs.forEach(l=>{
+    const cat = DB.categorias.find(c=>c.id===l.catId);
+    const nome = (cat?.nome||'').toLowerCase();
+    // Pular categorias que representam pagamento de fatura/transferência, não gasto de consumo
+    if(/cart[ãa]o de cr[ée]dito|fatura/.test(nome)) return;
+    catMap[l.catId] = (catMap[l.catId]||0) + l.valor;
+  });
+  const sortedCats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+
+  // Se sobrou só pagamento de fatura, não há categoria acionável a destacar
+  const frases = [];
+  if(sortedCats.length){
+    const topCat = DB.categorias.find(c=>c.id===sortedCats[0][0]) || {icone:'💸',nome:'Outros'};
+    const topVal = sortedCats[0][1];
+    const pctTop = desp>0 ? Math.round(topVal/desp*100) : 0;
+    frases.push(`Esse mês, a maior parte do seu dinheiro foi para <strong style="color:var(--tx)">${topCat.icone} ${topCat.nome}</strong> — cerca de <strong style="color:var(--am)">${fmtV(topVal)}</strong> (${pctTop}% dos seus gastos).`);
+  }
+
+  // Parcelas ativas
+  const parcelas = despLancs.filter(l=>l.parcTotal>1);
+  const totalParc = parcelas.reduce((s,l)=>s+l.valor,0);
+
+  // Frase 2 — saldo do mês (prioridade #3, não estourar) + incentivo a guardar (#4)
+  if(sal >= 0){
+    if(sal > 0){
+      frases.push(`Boa! Sobrou <strong style="color:var(--gr)">${fmtV(sal)}</strong> esse mês. Que tal guardar uma parte? Mesmo pouco já faz diferença 🐷`);
+    } else {
+      frases.push(`Você gastou exatamente o que ganhou esse mês. Tente deixar uma folga para guardar 🐷`);
+    }
+  } else {
+    frases.push(`⚠️ Atenção: esse mês você gastou <strong style="color:var(--rd)">${fmtV(Math.abs(sal))} a mais</strong> do que entrou. Vale dar uma olhada nos gastos.`);
+  }
+
+  // Frase 3 — parcelas (prioridade #2), só se houver
+  if(parcelas.length > 0){
+    frases.push(`Você tem <strong style="color:var(--tx)">${parcelas.length} ${parcelas.length===1?'parcela':'parcelas'}</strong> em andamento, somando <strong style="color:var(--am)">${fmtV(totalParc)}</strong> esse mês.`);
+  }
+
+  wrap.innerHTML = `
+    <div style="background:linear-gradient(135deg,rgba(91,141,239,.1),rgba(167,139,250,.05));border:1px solid rgba(91,141,239,.2);border-radius:16px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+        <span style="font-size:15px">💬</span>
+        <span style="font-size:11px;font-weight:700;color:var(--bl);text-transform:uppercase;letter-spacing:.05em">Seu resumo do mês</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        ${frases.map(f=>`<div style="font-size:13px;color:var(--ts);line-height:1.55">${f}</div>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ── ORÇAMENTO MENSAL ──────────────────────────────────────────────────────────
+// Ferramenta simples de "não estourar o mês": o usuário define um limite de
+// gastos e vê uma barra clara de quanto já usou, com avisos visuais.
+function renderOrcamento(ym, despMes){
+  const wrap = document.getElementById('orcamento-wrap');
+  if(!wrap) return;
+
+  const orcamento = DB.settings?.orcamentoMensal || 0;
+
+  // Sem orçamento definido — convite discreto para criar um
+  if(!orcamento){
+    wrap.innerHTML = `
+      <div onclick="abrirModalOrcamento()" style="background:var(--s1);border:1px dashed var(--bd);border-radius:14px;padding:14px;margin-bottom:12px;cursor:pointer;display:flex;align-items:center;gap:12px">
+        <div style="font-size:22px">🎯</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--tx)">Definir um limite de gastos</div>
+          <div style="font-size:11px;color:var(--mu)">Te avisamos antes de estourar o mês</div>
+        </div>
+        <div style="color:var(--mu);font-size:18px">›</div>
+      </div>`;
+    return;
+  }
+
+  const pct = Math.min(100, Math.round(despMes/orcamento*100));
+  const restante = orcamento - despMes;
+  let cor, msg, emoji;
+  if(pct < 70){ cor='var(--gr)'; emoji='😊'; msg=`Você ainda pode gastar <strong style="color:var(--gr)">${fmtV(Math.max(0,restante))}</strong> esse mês.`; }
+  else if(pct < 100){ cor='var(--am)'; emoji='😯'; msg=`Atenção: falta pouco para o limite. Restam <strong style="color:var(--am)">${fmtV(Math.max(0,restante))}</strong>.`; }
+  else { cor='var(--rd)'; emoji='😟'; msg=`Você passou do limite em <strong style="color:var(--rd)">${fmtV(Math.abs(restante))}</strong>. Tente segurar os gastos.`; }
+
+  wrap.innerHTML = `
+    <div onclick="abrirModalOrcamento()" style="background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:16px;margin-bottom:12px;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em">🎯 Limite do mês</div>
+        <div style="font-size:11px;color:var(--mu)">${fmtV(despMes)} de ${fmtV(orcamento)}</div>
+      </div>
+      <div style="height:10px;background:var(--s2);border-radius:5px;overflow:hidden;margin-bottom:10px">
+        <div style="height:100%;width:${pct}%;background:${cor};border-radius:5px;transition:width .5s"></div>
+      </div>
+      <div style="font-size:12px;color:var(--ts);line-height:1.5">${emoji} ${msg}</div>
+    </div>`;
+}
+
+function abrirModalOrcamento(){
+  const atual = DB.settings?.orcamentoMensal || '';
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--s1);border-radius:24px 24px 0 0;padding:24px 20px calc(28px + var(--safe-b));width:100%;max-width:480px;border-top:1px solid var(--bd)">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 18px"></div>
+      <div style="font-size:17px;font-weight:700;color:var(--tx);margin-bottom:6px">🎯 Limite de gastos do mês</div>
+      <div style="font-size:13px;color:var(--mu);line-height:1.5;margin-bottom:18px">Quanto você quer gastar no máximo por mês? A gente te avisa quando estiver chegando perto.</div>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--s2);border:1.5px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:18px">
+        <span style="font-size:16px;color:var(--mu)">R$</span>
+        <input id="input-orcamento" type="number" inputmode="decimal" value="${atual}" placeholder="0,00" style="flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-size:20px;font-weight:700;font-family:inherit">
+      </div>
+      <button onclick="salvarOrcamento()" style="width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--gr),var(--gr2));color:#06281d;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:8px">Salvar limite</button>
+      ${atual ? `<button onclick="removerOrcamento()" style="width:100%;padding:12px;border-radius:14px;border:none;background:transparent;color:var(--rd);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Remover limite</button>` : ''}
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:12px;border-radius:14px;border:none;background:transparent;color:var(--mu);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Cancelar</button>
+    </div>`;
+  modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
+  setTimeout(()=>document.getElementById('input-orcamento')?.focus(), 200);
+}
+
+function salvarOrcamento(){
+  const val = parseFloat(document.getElementById('input-orcamento').value);
+  if(!val || val <= 0){ showToast('Digite um valor válido'); return; }
+  if(!DB.settings) DB.settings = {};
+  DB.settings.orcamentoMensal = val;
+  dbSave();
+  document.querySelector('div[style*="fixed"]')?.remove();
+  showToast('Limite definido ✓');
+  renderInicio();
+}
+
+function removerOrcamento(){
+  if(!DB.settings) DB.settings = {};
+  DB.settings.orcamentoMensal = 0;
+  dbSave();
+  document.querySelector('div[style*="fixed"]')?.remove();
+  showToast('Limite removido');
+  renderInicio();
+}
+
+// ── PAINEL DE DÍVIDAS E PARCELAS ──────────────────────────────────────────────
+// Visão consolidada de tudo que está parcelado (conta + cartão), com quanto
+// ainda falta pagar e quando cada compromisso termina. Pensado para dar
+// tranquilidade e clareza a quem tem medo de se perder nas dívidas.
+function abrirPainelDividas(){
+  // Coletar parcelas de conta corrente e de cartão
+  const parcConta = Object.values(DB.lancamentos||{}).flat()
+    .filter(l=>l.parcTotal>1 && l.tipo==='desp')
+    .map(l=>({...l, origem:'Conta'}));
+  const parcCartao = Object.values(DB.gastosCartao||{}).flat()
+    .filter(g=>g.parcTotal>1)
+    .map(g=>({...g, origem:'Cartão'}));
+
+  // Deduplicar por descrição+valor+parcelas (mesma compra aparece em vários meses)
+  const todasRaw = [...parcConta, ...parcCartao];
+  const vistos = new Set();
+  const parcelas = todasRaw.filter(p=>{
+    const chave = `${p.desc}|${p.valor.toFixed(2)}|${p.parcTotal}`;
+    if(vistos.has(chave)) return false;
+    vistos.add(chave);
+    return true;
+  });
+
+  // Calcular total que ainda falta pagar
+  let totalRestante = 0;
+  parcelas.forEach(p=>{
+    const restantes = Math.max(0, p.parcTotal - p.parcAtual + 1);
+    totalRestante += restantes * p.valor;
+  });
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9000;display:flex;align-items:flex-end;justify-content:center';
+
+  const listaHtml = parcelas.length ? parcelas
+    .sort((a,b)=>(b.parcTotal-b.parcAtual)-(a.parcTotal-a.parcAtual))
+    .map(p=>{
+      const cat = DB.categorias.find(c=>c.id===p.catId) || {icone:'💸',nome:'Outros'};
+      const restantes = Math.max(0, p.parcTotal - p.parcAtual + 1);
+      const faltaPagar = restantes * p.valor;
+      const pctPago = Math.round((p.parcAtual-1)/p.parcTotal*100);
+      return `<div style="background:var(--s2);border-radius:14px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div style="font-size:20px">${cat.icone}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.desc}</div>
+            <div style="font-size:11px;color:var(--mu)">${p.origem} · parcela ${p.parcAtual} de ${p.parcTotal}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:13px;font-weight:700;color:var(--am)">${fmtV(p.valor)}</div>
+            <div style="font-size:10px;color:var(--mu)">por mês</div>
+          </div>
+        </div>
+        <div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:6px">
+          <div style="height:100%;width:${pctPago}%;background:var(--gr)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:var(--gr)">${pctPago}% pago</span>
+          <span style="color:var(--ts)">Falta <strong>${fmtV(faltaPagar)}</strong> (${restantes}x)</span>
+        </div>
+      </div>`;
+    }).join('')
+    : '<div style="text-align:center;padding:30px 0;color:var(--mu)"><div style="font-size:32px;margin-bottom:8px">🎉</div><div style="font-size:13px">Você não tem nenhuma parcela em andamento!</div></div>';
+
+  modal.innerHTML = `
+    <div style="background:var(--s1);border-radius:24px 24px 0 0;padding:24px 20px calc(28px + var(--safe-b));width:100%;max-width:480px;max-height:85vh;overflow-y:auto;border-top:1px solid var(--bd)">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 18px"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:20px">📦</span>
+        <span style="font-size:17px;font-weight:700;color:var(--tx)">Minhas parcelas</span>
+      </div>
+      ${parcelas.length ? `
+      <div style="background:linear-gradient(135deg,rgba(255,194,75,.12),rgba(255,122,122,.06));border:1px solid rgba(255,194,75,.25);border-radius:16px;padding:16px;margin:14px 0 18px">
+        <div style="font-size:12px;color:var(--ts);margin-bottom:4px">Ainda falta pagar no total</div>
+        <div style="font-size:26px;font-weight:800;color:var(--am)">${fmtV(totalRestante)}</div>
+        <div style="font-size:11px;color:var(--mu);margin-top:4px">distribuído nas próximas parcelas</div>
+      </div>` : ''}
+      ${listaHtml}
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:8px;padding:13px;border-radius:14px;border:none;background:var(--s2);color:var(--tx);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Fechar</button>
+    </div>`;
+  modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
 }
 
 // ── LANÇAMENTOS ───────────────────────────────────────────────────────────────
