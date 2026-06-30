@@ -79,7 +79,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font-
 
 /* ── BOTTOM NAV ─────────────────────────────────────────────────────────── */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(15,23,42,.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid rgba(51,65,85,.6);display:flex;padding-bottom:var(--safe-b)}
-.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 8px;cursor:pointer;gap:4px;transition:all .15s;position:relative}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 2px 7px;cursor:pointer;gap:2px;transition:all .15s;position:relative;min-width:0}
+.bnav-icon{font-size:18px}
+.bnav-label{font-size:9px;white-space:nowrap}
 .bnav-icon{font-size:20px;transition:transform .2s}
 .bnav-label{font-size:9px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;transition:color .15s}
 .bnav-item.active .bnav-label{color:var(--gr)}
@@ -485,29 +487,28 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div id="imp-step1">
       <div class="section-title">O que você quer importar?</div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
-        <button class="imp-type-card active" id="iBtn_extrato" onclick="selImpTipo('extrato')">
+        <button class="imp-type-card active" id="iBtn_comprovante" onclick="selImpTipo('comprovante')">
+          <div class="imp-type-card-icon">🧾</div>
+          <div class="imp-type-card-body">
+            <div class="imp-type-card-title">Extrato ou comprovante</div>
+            <div class="imp-type-card-sub">Foto, PDF ou texto. A IA lê e cria os lançamentos da sua conta.</div>
+          </div>
+          <div class="imp-type-card-check" id="iCheck_comprovante">✓</div>
+        </button>
+        <button class="imp-type-card" id="iBtn_fatura" onclick="navTo('cartao');setTimeout(()=>document.getElementById('cartao-imp-btn')?.click(),100)">
+          <div class="imp-type-card-icon">💳</div>
+          <div class="imp-type-card-body">
+            <div class="imp-type-card-title">Fatura de cartão de crédito</div>
+            <div class="imp-type-card-sub">Vai para a aba Cartão — não afeta o saldo da conta.</div>
+          </div>
+          <div class="imp-type-card-check" style="opacity:0">✓</div>
+        </button>
+        <button class="imp-type-card" id="iBtn_extrato" onclick="selImpTipo('extrato')" style="display:none">
           <div class="imp-type-card-icon">🏦</div>
           <div class="imp-type-card-body">
             <div class="imp-type-card-title">Extrato bancário</div>
-            <div class="imp-type-card-sub">Itaú, Nubank, Bradesco, Inter, BB, Caixa, C6...</div>
           </div>
-          <div class="imp-type-card-check" id="iCheck_extrato">✓</div>
-        </button>
-        <button class="imp-type-card" id="iBtn_fatura" onclick="selImpTipo('fatura')">
-          <div class="imp-type-card-icon">💳</div>
-          <div class="imp-type-card-body">
-            <div class="imp-type-card-title">Fatura de cartão</div>
-            <div class="imp-type-card-sub">Latam Pass, Nubank, Inter, Bradesco, Santander...</div>
-          </div>
-          <div class="imp-type-card-check" id="iCheck_fatura" style="opacity:0">✓</div>
-        </button>
-        <button class="imp-type-card" id="iBtn_comprovante" onclick="selImpTipo('comprovante')">
-          <div class="imp-type-card-icon">🧾</div>
-          <div class="imp-type-card-body">
-            <div class="imp-type-card-title">Comprovante de pagamento</div>
-            <div class="imp-type-card-sub">PIX, TED, boleto — foto ou PDF. IA lê e cria o lançamento.</div>
-          </div>
-          <div class="imp-type-card-check" id="iCheck_comprovante" style="opacity:0">✓</div>
+          <div class="imp-type-card-check" id="iCheck_extrato" style="opacity:0">✓</div>
         </button>
       </div>
       <!-- Upload comprovante -->
@@ -616,14 +617,109 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
   </div>
 
+  <!-- ── TAB: CARTÃO DE CRÉDITO ─────────────────────────────────────── -->
+  <div class="tab-content page" id="tab-cartao">
+
+    <div id="cartao-step-lista">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn-main" id="cartao-imp-btn" style="flex:1" onclick="abrirImportFatura()">📥 Importar fatura</button>
+        <button class="btn-ghost" style="flex:1" onclick="abrirLancCartaoManual()">✍️ Lançar gasto</button>
+      </div>
+
+      <div id="cartao-resumo-cards" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px;scrollbar-width:none"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="section-title" style="margin:0">Gastos no cartão</div>
+        <button onclick="abrirGestaoCartoes()" style="background:none;border:none;color:var(--mu);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px">⚙️ Cartões</button>
+      </div>
+
+      <div id="cartao-filtro-wrap" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none"></div>
+
+      <div id="cartao-lanc-list"></div>
+
+      <div id="cartao-insight-wrap" style="margin-top:16px"></div>
+    </div>
+
+    <!-- Import de fatura (reaproveitando o fluxo de parser) -->
+    <div id="cartao-step-import" style="display:none">
+      <button onclick="document.getElementById('cartao-step-import').style.display='none';document.getElementById('cartao-step-lista').style.display=''" style="background:none;border:none;color:var(--mu);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px">← Voltar</button>
+
+      <div class="form-label">Qual cartão é essa fatura?</div>
+      <div id="cartao-select-import" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
+
+      <div id="iCartaoWrap2" style="margin-bottom:16px">
+        <div class="form-label">Qual portador importar?</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
+            <input type="radio" name="cartaoFiltroPortador" value="todos" checked style="accent-color:var(--gr)">
+            <div><div style="font-size:13px;font-weight:600">Todos os portadores</div></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
+            <input type="radio" name="cartaoFiltroPortador" value="titular" style="accent-color:var(--gr)">
+            <div><div style="font-size:13px;font-weight:600">Somente titular</div></div>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
+            <input type="radio" name="cartaoFiltroPortador" value="adicional" style="accent-color:var(--gr)">
+            <div><div style="font-size:13px;font-weight:600">Somente adicionais</div></div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-label">Arquivo ou texto da fatura</div>
+      <div class="drop-zone" id="iDropZoneFatura"
+        onclick="document.getElementById('iFileInputFatura').click()"
+        ondrop="handleDropFatura(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <div class="drop-zone-icon">💳</div>
+        <div class="drop-zone-title">Toque para escolher o PDF</div>
+        <div class="drop-zone-sub">ou arraste o arquivo aqui</div>
+        <input type="file" id="iFileInputFatura" accept=".pdf,.txt" style="display:none" onchange="handleFileInputFatura(event)">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:12px 0">
+        <div style="flex:1;height:1px;background:var(--bd)"></div>
+        <div style="font-size:11px;color:var(--mu);font-weight:600">ou cole o texto</div>
+        <div style="flex:1;height:1px;background:var(--bd)"></div>
+      </div>
+      <textarea id="iTextoRawFatura" placeholder="Cole o texto da fatura do cartão (PDF copiado)..." style="width:100%;min-height:120px;background:var(--s1);border:1.5px solid var(--bd);border-radius:14px;padding:14px;color:var(--tx);font-family:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
+
+      <button class="btn-main" onclick="rodarParserFatura()">🔍 Analisar fatura</button>
+      <button class="btn-ghost" style="margin-top:10px" onclick="rodarParserFaturaIA()">✨ Analisar com IA (recomendado)</button>
+    </div>
+
+    <!-- Revisão dos itens da fatura antes de confirmar -->
+    <div id="cartao-step-revisao" style="display:none">
+      <button onclick="document.getElementById('cartao-step-revisao').style.display='none';document.getElementById('cartao-step-import').style.display=''" style="background:none;border:none;color:var(--mu);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px">← Voltar</button>
+      <div class="section-title" id="cartaoRevSub">Itens encontrados</div>
+      <div id="cartaoRevList"></div>
+      <div style="position:sticky;bottom:8px;margin-top:14px">
+        <button class="btn-main" onclick="confirmarImportacaoFatura()">✓ Importar itens da fatura</button>
+      </div>
+    </div>
+
+  </div>
+
   <!-- ── TAB: RELATÓRIOS ────────────────────────────────────────────── -->
   <div class="tab-content page" id="tab-rel">
-    <div class="period-tabs">
-      <button class="period-tab active" onclick="setPeriod('mes',this)">Mês</button>
-      <button class="period-tab" onclick="setPeriod('trim',this)">Trimestre</button>
-      <button class="period-tab" onclick="setPeriod('ano',this)">Ano</button>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="imp-type-btn active" id="rel-sub-conta" onclick="setRelSub('conta')">💰 Conta Corrente</button>
+      <button class="imp-type-btn" id="rel-sub-cartao" onclick="setRelSub('cartao')">💳 Cartão de Crédito</button>
     </div>
-    <div id="rel-content"></div>
+    <div id="rel-conta-wrap">
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="setPeriod('mes',this)">Mês</button>
+        <button class="period-tab" onclick="setPeriod('trim',this)">Trimestre</button>
+        <button class="period-tab" onclick="setPeriod('ano',this)">Ano</button>
+      </div>
+      <div id="rel-content"></div>
+    </div>
+    <div id="rel-cartao-wrap" style="display:none">
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="setPeriodCartao('mes',this)">Mês</button>
+        <button class="period-tab" onclick="setPeriodCartao('trim',this)">Trimestre</button>
+        <button class="period-tab" onclick="setPeriodCartao('ano',this)">Ano</button>
+      </div>
+      <div id="rel-cartao-content"></div>
+    </div>
   </div>
 
   <!-- ── TAB: CONFIGURAÇÕES ─────────────────────────────────────────── -->
@@ -742,15 +838,19 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
   <div class="bnav-item" onclick="navTo('lanc')" id="bnav-lanc">
     <div class="bnav-icon">📋</div>
-    <div class="bnav-label">Lançamentos</div>
+    <div class="bnav-label">Lanç.</div>
   </div>
   <div class="bnav-item" onclick="navTo('imp')" id="bnav-imp">
     <div class="bnav-icon">📥</div>
     <div class="bnav-label">Importar</div>
   </div>
+  <div class="bnav-item" onclick="navTo('cartao')" id="bnav-cartao">
+    <div class="bnav-icon">💳</div>
+    <div class="bnav-label">Cartão</div>
+  </div>
   <div class="bnav-item" onclick="navTo('rel')" id="bnav-rel">
     <div class="bnav-icon">📊</div>
-    <div class="bnav-label">Relatórios</div>
+    <div class="bnav-label">Relat.</div>
   </div>
   <div class="bnav-item" onclick="navTo('cfg')" id="bnav-cfg">
     <div class="bnav-icon">⚙️</div>
@@ -760,6 +860,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
 <!-- FAB -->
 <button class="fab" id="fab" style="display:none" onclick="openDrawer('drawer-lanc')" title="Novo lançamento">＋</button>
+<button class="fab" id="fab-cartao" style="display:none" onclick="abrirLancCartaoManual()" title="Novo gasto no cartão">＋</button>
 
 <!-- ══════════════════════════════════════════════════════════════════════ -->
 <!-- DRAWERS / MODAIS                                                       -->
@@ -938,7 +1039,15 @@ let DB = {
   uso: {importacoesMes: {}, lancamentosMes: {}},
   saldoConta: null,        // saldo real da conta bancária
   saldoContaData: null,    // data de referência do saldo
+  cartoes: [],             // [{id, nome, cor}] — ex: Nubank, Itaú, Bradesco
+  gastosCartao: {},        // {AAAA-MM: [{id, cartaoId, catId, valor, desc, data}]}
 };
+
+const CARTOES_DEFAULT = [
+  {id:'cd1', nome:'Nubank',   cor:'#8a05be'},
+  {id:'cd2', nome:'Itaú',     cor:'#ec7000'},
+  {id:'cd3', nome:'Bradesco', cor:'#cc092f'},
+];
 
 // Verificar se o usuário é Pro
 function isPro(){
@@ -1303,19 +1412,22 @@ function navTo(tab){
   const bnav = document.getElementById('bnav-'+tab);
   if(bnav) bnav.classList.add('active');
 
-  const titles = {inicio:'Início',lanc:'Lançamentos',imp:'Importar',rel:'Relatórios',cfg:'Configurações'};
+  const titles = {inicio:'Início',lanc:'Lançamentos',imp:'Importar',cartao:'Cartão de Crédito',rel:'Relatórios',cfg:'Configurações'};
   document.getElementById('topbar-title').textContent = titles[tab]||tab;
 
   const mnav = document.getElementById('month-nav');
-  mnav.style.display = (tab==='inicio'||tab==='lanc') ? 'flex' : 'none';
+  mnav.style.display = (tab==='inicio'||tab==='lanc'||tab==='cartao') ? 'flex' : 'none';
 
   const fab = document.getElementById('fab');
   fab.style.display = (tab==='inicio'||tab==='lanc') ? 'flex' : 'none';
+  const fabCartao = document.getElementById('fab-cartao');
+  if(fabCartao) fabCartao.style.display = tab==='cartao' ? 'flex' : 'none';
 
   if(tab==='inicio')  { renderInicio(); if(isPro()) gerarInsightIA(); }
   if(tab==='lanc')    renderLanc();
   if(tab==='rel')     renderRel();
   if(tab==='imp')     initImpMes();
+  if(tab==='cartao')  renderCartao();
   if(tab==='cfg')     renderInstallSection();
 }
 
@@ -2140,38 +2252,31 @@ function initImpMes(){
 }
 
 function selImpTipo(tipo){
-  impTipo = tipo;
-  // Cards
-  ['extrato','fatura','comprovante'].forEach(t=>{
-    const btn = document.getElementById('iBtn_'+t);
-    const chk = document.getElementById('iCheck_'+t);
-    if(btn) btn.classList.toggle('active', t===tipo);
-    if(chk) chk.style.opacity = t===tipo ? '1' : '0';
-  });
-  // Mostrar/ocultar seções específicas
-  document.getElementById('iCartaoWrap').style.display     = tipo==='fatura'      ? '' : 'none';
-  document.getElementById('comprovante-wrap').style.display= tipo==='comprovante' ? '' : 'none';
-  // Área principal — ocultar no modo comprovante
+  // Fluxo unificado: 'comprovante' agora cobre tanto upload de imagem/PDF de comprovante
+  // quanto extrato em texto/PDF — é tudo a mesma coisa para o usuário: "manda o documento".
+  impTipo = (tipo === 'comprovante') ? 'extrato' : tipo;
+
+  document.getElementById('iBtn_comprovante').classList.add('active');
+  document.getElementById('iCheck_comprovante').style.opacity = '1';
+
+  // Sempre mostrar tudo junto: upload de comprovante (imagem/PDF) + área de extrato (PDF/texto)
+  document.getElementById('iCartaoWrap').style.display = 'none';
+  document.getElementById('comprovante-wrap').style.display = '';
+
   const dz = document.getElementById('iDropZone');
-  if(dz) dz.style.display = tipo==='comprovante' ? 'none' : '';
+  if(dz) dz.style.display = '';
   const ta = document.getElementById('iTextoRaw');
-  ta.style.display = tipo==='comprovante' ? 'none' : '';
-  // Separador "ou cole o texto"
+  ta.style.display = '';
   const sep = ta.previousElementSibling;
-  if(sep) sep.style.display = tipo==='comprovante' ? 'none' : '';
-  // Botões analisar
+  if(sep) sep.style.display = '';
   ['rodarParser','rodarParserIA','verTextoExtraido'].forEach(fn=>{
     const b = document.querySelector('[onclick*="'+fn+'"]');
-    if(b) b.style.display = tipo==='comprovante' ? 'none' : '';
+    if(b) b.style.display = '';
   });
   const dica = document.querySelector('#imp-step1 [style*="10px;color:var(--mu)"]');
-  if(dica) dica.style.display = tipo==='comprovante' ? 'none' : '';
-  // Placeholder da textarea
-  if(tipo==='extrato'){
-    ta.placeholder='Cole o texto do extrato bancário (PDF copiado)...\n\nO Finia reconhece automaticamente Itaú, Nubank, Bradesco, Inter, BB, Caixa e C6.';
-  } else {
-    ta.placeholder='Cole o texto da fatura do cartão (PDF copiado)...\n\nO Finia reconhece automaticamente Latam Pass, Nubank, Inter, Bradesco e Santander.';
-  }
+  if(dica) dica.style.display = '';
+
+  ta.placeholder='Cole o texto do extrato bancário (PDF copiado)...\n\nO Finia reconhece automaticamente Itaú, Nubank, Bradesco, Inter, BB, Caixa e C6.';
 }
 
 function getCartaoFiltro(){
@@ -4676,5 +4781,615 @@ Retorne APENAS JSON válido:
     if(status){ status.textContent = '⚠️ '+err.message; }
     showToast('Erro: '+err.message.slice(0,60));
   }
+}
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// ABA CARTÃO DE CRÉDITO — gestão de cartões, lançamento manual, import de fatura
+// ══════════════════════════════════════════════════════════════════════════════
+
+let cartaoFiltroId = 'todos'; // filtro de cartão na lista
+let cartaoImpSelId = null;    // cartão selecionado durante import de fatura
+let parsedItemsFatura = [];   // itens pendentes de confirmação na revisão da fatura
+
+function garantirCartoesPadrao(){
+  if(!DB.cartoes || !DB.cartoes.length){
+    DB.cartoes = [...CARTOES_DEFAULT];
+    dbSave();
+  }
+}
+
+function mesAtualCartao(){ return currentMes || mesAtual(); }
+
+function getGastosCartao(mes){
+  mes = mes || mesAtualCartao();
+  if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
+  return DB.gastosCartao[mes];
+}
+
+// ── RENDER PRINCIPAL DA ABA ──────────────────────────────────────────────────
+function renderCartao(){
+  garantirCartoesPadrao();
+  renderCartaoResumoCards();
+  renderCartaoFiltro();
+  renderCartaoLancList();
+  if(isPro()) gerarInsightCartaoIA();
+}
+
+function renderCartaoResumoCards(){
+  const wrap = document.getElementById('cartao-resumo-cards');
+  if(!wrap) return;
+  const gastos = getGastosCartao();
+  const porCartao = {};
+  gastos.forEach(g => { porCartao[g.cartaoId] = (porCartao[g.cartaoId]||0) + g.valor; });
+
+  const totalGeral = gastos.reduce((s,g)=>s+g.valor,0);
+
+  let html = `<div style="flex-shrink:0;min-width:130px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:16px;padding:14px">
+    <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.05em">Total no mês</div>
+    <div style="font-size:20px;font-weight:800;color:#fff;font-family:'DM Mono',monospace;margin-top:4px">${fmtV(totalGeral)}</div>
+  </div>`;
+
+  DB.cartoes.forEach(c=>{
+    const total = porCartao[c.id] || 0;
+    html += `<div style="flex-shrink:0;min-width:130px;background:var(--s1);border:1.5px solid var(--bd);border-radius:16px;padding:14px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${c.cor}"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--mu)">${c.nome}</div>
+      </div>
+      <div style="font-size:17px;font-weight:800;font-family:'DM Mono',monospace">${fmtV(total)}</div>
+    </div>`;
+  });
+
+  wrap.innerHTML = html;
+}
+
+function renderCartaoFiltro(){
+  const wrap = document.getElementById('cartao-filtro-wrap');
+  if(!wrap) return;
+  let html = `<button onclick="setCartaoFiltroId('todos')" style="flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px solid ${cartaoFiltroId==='todos'?'#6366f1':'#334155'};background:${cartaoFiltroId==='todos'?'rgba(99,102,241,.15)':'var(--s2)'};color:${cartaoFiltroId==='todos'?'#a78bfa':'#94a3b8'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">Todos</button>`;
+  DB.cartoes.forEach(c=>{
+    const sel = cartaoFiltroId === c.id;
+    html += `<button onclick="setCartaoFiltroId('${c.id}')" style="flex-shrink:0;padding:6px 14px;border-radius:20px;border:1.5px solid ${sel?c.cor:'#334155'};background:${sel?c.cor+'22':'var(--s2)'};color:${sel?c.cor:'#94a3b8'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">${c.nome}</button>`;
+  });
+  wrap.innerHTML = html;
+}
+
+function setCartaoFiltroId(id){
+  cartaoFiltroId = id;
+  renderCartaoFiltro();
+  renderCartaoLancList();
+}
+
+function renderCartaoLancList(){
+  const list = document.getElementById('cartao-lanc-list');
+  if(!list) return;
+  let gastos = getGastosCartao().slice().sort((a,b)=>b.data.localeCompare(a.data));
+  if(cartaoFiltroId !== 'todos') gastos = gastos.filter(g=>g.cartaoId===cartaoFiltroId);
+
+  if(!gastos.length){
+    list.innerHTML = `<div class="empty"><div class="empty-icon">💳</div><div class="empty-title">Nenhum gasto no cartão</div><div class="empty-sub">Importe uma fatura ou lance manualmente.</div></div>`;
+    return;
+  }
+
+  list.innerHTML = '<div class="card" style="padding:4px 16px">' + gastos.map(g=>{
+    const cat = DB.categorias.find(c=>c.id===g.catId) || {icone:'💸',nome:'Outros',cor:'#64748b'};
+    const cartao = DB.cartoes.find(c=>c.id===g.cartaoId) || {nome:'Cartão',cor:'#64748b'};
+    const dataFmt = g.data ? new Date(g.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
+    const parcInfo = g.parcTotal>1 ? ` · ${g.parcAtual}/${g.parcTotal}` : '';
+    return `<div class="lanc-item" data-id="${g.id}" onclick="editGastoCartao('${g.id}')">
+      <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
+      <div class="lanc-info">
+        <div class="lanc-desc">${g.desc}</div>
+        <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt} · <span style="color:${cartao.cor}">${cartao.nome}</span></div>
+      </div>
+      <div class="lanc-val desp">-${fmtV(g.valor)}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// ── LANÇAMENTO MANUAL DE GASTO NO CARTÃO ─────────────────────────────────────
+function abrirLancCartaoManual(catId, editId){
+  garantirCartoesPadrao();
+  const modal = document.createElement('div');
+  modal.id = '_modal-lanc-cartao';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+
+  const editando = !!editId;
+  const gasto = editando ? getGastosCartao().find(g=>g.id===editId) : null;
+
+  const catsHtml = DB.categorias.filter(c=>c.tipo==='desp').map(c=>
+    `<option value="${c.id}" ${gasto&&gasto.catId===c.id?'selected':''}>${c.icone} ${c.nome}</option>`
+  ).join('');
+  const cartoesHtml = DB.cartoes.map(c=>
+    `<option value="${c.id}" ${gasto&&gasto.cartaoId===c.id?'selected':''}>${c.nome}</option>`
+  ).join('');
+
+  modal.innerHTML = `
+    <div style="background:#1e293b;border-radius:20px 20px 0 0;padding:24px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="font-size:16px;font-weight:700;color:#f1f5f9">${editando?'✏️ Editar gasto':'💳 Novo gasto no cartão'}</div>
+        <button id="_btn-fechar-lc" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer">✕</button>
+      </div>
+
+      <div class="form-label">Valor</div>
+      <input type="number" id="lc-valor" inputmode="decimal" step="0.01" placeholder="0,00" value="${gasto?gasto.valor:''}"
+        style="width:100%;padding:14px;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;color:var(--tx);font-size:18px;font-weight:700;font-family:'DM Mono',monospace;margin-bottom:14px">
+
+      <div class="form-label">Descrição</div>
+      <input type="text" id="lc-desc" placeholder="Ex: Compra no mercado" value="${gasto?gasto.desc:''}"
+        style="width:100%;padding:12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;color:var(--tx);font-size:14px;margin-bottom:14px">
+
+      <div class="form-label">Categoria</div>
+      <select id="lc-cat" style="width:100%;padding:12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;color:var(--tx);font-size:14px;margin-bottom:14px">
+        ${catsHtml}
+      </select>
+
+      <div class="form-label">Cartão</div>
+      <select id="lc-cartao" style="width:100%;padding:12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;color:var(--tx);font-size:14px;margin-bottom:14px">
+        ${cartoesHtml}
+      </select>
+
+      <div class="form-label">Data</div>
+      <input type="date" id="lc-data" value="${gasto?gasto.data:new Date().toISOString().slice(0,10)}"
+        style="width:100%;padding:12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;color:var(--tx);font-size:14px;margin-bottom:20px">
+
+      <button id="_btn-salvar-lc" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gr);color:#0f172a;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:8px">
+        ${editando?'Salvar alterações':'Adicionar gasto'}
+      </button>
+      ${editando?`<button id="_btn-excluir-lc" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #ef4444;background:transparent;color:#ef4444;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">🗑 Excluir</button>`:''}
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  const fechar = () => modal.remove();
+  document.getElementById('_btn-fechar-lc').addEventListener('click', fechar);
+  modal.addEventListener('click', e=>{ if(e.target===modal) fechar(); });
+
+  document.getElementById('_btn-salvar-lc').addEventListener('click', ()=>{
+    const valor = parseFloat(document.getElementById('lc-valor').value);
+    const desc  = document.getElementById('lc-desc').value.trim();
+    const catId = document.getElementById('lc-cat').value;
+    const cartaoId = document.getElementById('lc-cartao').value;
+    const data  = document.getElementById('lc-data').value;
+
+    if(!valor || valor <= 0){ showToast('Informe um valor válido'); return; }
+    if(!desc){ showToast('Informe uma descrição'); return; }
+
+    const mes = data.slice(0,7);
+    if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
+
+    if(editando){
+      const g = DB.gastosCartao[mes===gasto.data.slice(0,7)?mes:gasto.data.slice(0,7)]?.find(x=>x.id===editId) || gasto;
+      // Remove do mês antigo se a data mudou de mês
+      const mesAntigo = gasto.data.slice(0,7);
+      if(mesAntigo !== mes){
+        DB.gastosCartao[mesAntigo] = DB.gastosCartao[mesAntigo].filter(x=>x.id!==editId);
+        if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
+        DB.gastosCartao[mes].push({...gasto, valor, desc, catId, cartaoId, data});
+      } else {
+        Object.assign(g, {valor, desc, catId, cartaoId, data});
+      }
+    } else {
+      DB.gastosCartao[mes].push({
+        id: 'gc'+Date.now()+Math.random().toString(36).slice(2,7),
+        valor, desc, catId, cartaoId, data,
+        parcAtual: 1, parcTotal: 1
+      });
+    }
+
+    dbSave();
+    fechar();
+    showToast(editando?'Gasto atualizado ✓':'Gasto adicionado ✓');
+    renderCartao();
+  });
+
+  if(editando){
+    document.getElementById('_btn-excluir-lc').addEventListener('click', ()=>{
+      const mes = gasto.data.slice(0,7);
+      DB.gastosCartao[mes] = DB.gastosCartao[mes].filter(g=>g.id!==editId);
+      dbSave();
+      fechar();
+      showToast('Gasto excluído ✓');
+      renderCartao();
+    });
+  }
+}
+
+function editGastoCartao(id){
+  const gasto = getGastosCartao().find(g=>g.id===id);
+  if(gasto) abrirLancCartaoManual(null, id);
+}
+
+// ── GESTÃO DE CARTÕES (adicionar/editar nomes) ───────────────────────────────
+function abrirGestaoCartoes(){
+  const modal = document.createElement('div');
+  modal.id = '_modal-gestao-cartoes';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+
+  const render = () => `
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;padding:24px;max-width:380px;width:100%;max-height:80vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:16px;font-weight:700;color:#f1f5f9">💳 Seus cartões</div>
+        <button id="_btn-fechar-gc" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer">✕</button>
+      </div>
+      <div id="_lista-cartoes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        ${DB.cartoes.map(c=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0f172a;border:1.5px solid #334155;border-radius:12px">
+            <div style="width:14px;height:14px;border-radius:50%;background:${c.cor};flex-shrink:0"></div>
+            <input type="text" data-id="${c.id}" data-field="nome" value="${c.nome}" style="flex:1;background:none;border:none;color:#f1f5f9;font-size:13px;font-weight:600;font-family:inherit">
+            <button data-del="${c.id}" style="background:none;border:none;color:#ef4444;font-size:14px;cursor:pointer">🗑</button>
+          </div>`).join('')}
+      </div>
+      <button id="_btn-add-cartao" style="width:100%;padding:12px;border-radius:12px;border:1.5px dashed #475569;background:transparent;color:#94a3b8;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">+ Adicionar cartão</button>
+      <button id="_btn-salvar-gc" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gr);color:#0f172a;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">Salvar</button>
+    </div>`;
+
+  modal.innerHTML = render();
+  document.body.appendChild(modal);
+
+  const fechar = () => modal.remove();
+  const rebind = () => {
+    document.getElementById('_btn-fechar-gc')?.addEventListener('click', fechar);
+    document.getElementById('_btn-add-cartao')?.addEventListener('click', ()=>{
+      const novo = {id:'cd'+Date.now(), nome:'Novo cartão', cor:'#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0')};
+      DB.cartoes.push(novo);
+      modal.innerHTML = render();
+      rebind();
+    });
+    modal.querySelectorAll('[data-del]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.dataset.del;
+        if(DB.cartoes.length <= 1){ showToast('Mantenha pelo menos 1 cartão'); return; }
+        DB.cartoes = DB.cartoes.filter(c=>c.id!==id);
+        modal.innerHTML = render();
+        rebind();
+      });
+    });
+    document.getElementById('_btn-salvar-gc')?.addEventListener('click', ()=>{
+      modal.querySelectorAll('[data-field="nome"]').forEach(inp=>{
+        const c = DB.cartoes.find(x=>x.id===inp.dataset.id);
+        if(c && inp.value.trim()) c.nome = inp.value.trim();
+      });
+      dbSave();
+      fechar();
+      showToast('Cartões atualizados ✓');
+      renderCartao();
+    });
+  };
+  rebind();
+  modal.addEventListener('click', e=>{ if(e.target===modal) fechar(); });
+}
+
+// ── IMPORTAR FATURA ───────────────────────────────────────────────────────────
+function abrirImportFatura(){
+  garantirCartoesPadrao();
+  document.getElementById('cartao-step-lista').style.display = 'none';
+  document.getElementById('cartao-step-import').style.display = '';
+
+  const sel = document.getElementById('cartao-select-import');
+  cartaoImpSelId = DB.cartoes[0]?.id || null;
+  sel.innerHTML = DB.cartoes.map(c=>
+    `<button data-cid="${c.id}" class="imp-type-btn${c.id===cartaoImpSelId?' active':''}" style="border-color:${c.cor}">${c.nome}</button>`
+  ).join('');
+  sel.querySelectorAll('[data-cid]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      cartaoImpSelId = btn.dataset.cid;
+      sel.querySelectorAll('[data-cid]').forEach(b=>b.classList.toggle('active', b===btn));
+    });
+  });
+}
+
+function handleDropFatura(e){ e.preventDefault(); handleDragLeave(); processFileFatura(e.dataTransfer.files[0]); }
+function handleFileInputFatura(e){ processFileFatura(e.target.files[0]); }
+
+function processFileFatura(file){
+  if(!file) return;
+  if(file.name.endsWith('.pdf') || file.type==='application/pdf'){
+    extractPdfFatura(file);
+  } else {
+    const r = new FileReader();
+    r.onload = ev => { document.getElementById('iTextoRawFatura').value = ev.target.result; };
+    r.readAsText(file,'utf-8');
+  }
+}
+
+async function extractPdfFatura(file){
+  const zone = document.getElementById('iDropZoneFatura');
+  zone.innerHTML = '<div class="drop-zone-icon" style="animation:pulse 1s infinite">⏳</div><div class="drop-zone-title">Lendo PDF...</div>';
+  const load = () => {
+    if(typeof pdfjsLib!=='undefined'){ doExtractFatura(file); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; doExtractFatura(file); };
+    document.head.appendChild(s);
+  };
+  load();
+}
+
+async function doExtractFatura(file){
+  const zone = document.getElementById('iDropZoneFatura');
+  try {
+    const ab  = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:ab}).promise;
+    let txt = '';
+    for(let p=1; p<=pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const byY = {};
+      content.items.forEach(item=>{
+        if(!item.str) return;
+        const y = Math.round(item.transform[5] / 2) * 2;
+        if(!byY[y]) byY[y] = [];
+        byY[y].push({x:item.transform[4], str:item.str, w:item.width||0});
+      });
+      Object.keys(byY).sort((a,b)=>b-a).forEach(y=>{
+        const itens = byY[y].sort((a,b)=>a.x-b.x);
+        let linha = '', prevEndX = null;
+        itens.forEach(item=>{
+          const s = item.str; if(!s) return;
+          const startX = item.x, endX = startX + (item.w || s.length*6);
+          if(prevEndX===null) linha += s;
+          else { const gap = startX-prevEndX; linha += gap>20?'  '+s:gap>3?' '+s:s; }
+          prevEndX = endX;
+        });
+        if(linha.trim()) txt += linha.trim() + '\n';
+      });
+    }
+    document.getElementById('iTextoRawFatura').value = txt;
+    zone.innerHTML = `<div class="drop-zone-icon">✅</div><div class="drop-zone-title">${file.name}</div><div class="drop-zone-sub" style="color:var(--gr)">${pdf.numPages} página(s) lida(s)</div>`;
+  } catch(err){
+    zone.innerHTML = `<div class="drop-zone-icon">❌</div><div class="drop-zone-title">Não foi possível ler o PDF</div><div class="drop-zone-sub">${err.message}</div>`;
+  }
+}
+
+function rodarParserFatura(){
+  const txt = document.getElementById('iTextoRawFatura').value.trim();
+  if(!txt){ showToast('Cole o texto da fatura primeiro 📋'); return; }
+  if(!cartaoImpSelId){ showToast('Selecione um cartão'); return; }
+
+  // Reutilizar getCartaoFiltro lendo o radio correto desta tela
+  const filtroEl = document.querySelector('input[name="cartaoFiltroPortador"]:checked');
+  window._cartaoFiltroPortadorOverride = filtroEl ? filtroEl.value : 'todos';
+
+  parsedItemsFatura = parsearFaturaParaCartao(txt);
+  abrirRevisaoFatura();
+}
+
+function parsearFaturaParaCartao(txt){
+  // Reaproveita parsearFatura, mas getCartaoFiltro precisa ler o filtro certo
+  const filtroOriginal = getCartaoFiltro;
+  window.getCartaoFiltro = () => window._cartaoFiltroPortadorOverride || 'todos';
+  const items = parsearFatura(txt);
+  window.getCartaoFiltro = filtroOriginal;
+  return items;
+}
+
+async function rodarParserFaturaIA(){
+  const txt = document.getElementById('iTextoRawFatura').value.trim();
+  if(!txt){ showToast('Cole o texto da fatura primeiro 📋'); return; }
+  if(!cartaoImpSelId){ showToast('Selecione um cartão'); return; }
+  if(!isPro()){ showToast('Análise com IA é exclusiva do plano Pro ✨'); return; }
+
+  showToast('✨ Analisando fatura com IA...');
+  try {
+    const cats = DB.categorias.filter(c=>c.tipo==='desp').map(c=>c.nome).join(', ');
+    const prompt = `Extraia todos os lançamentos desta fatura de cartão de crédito brasileira.
+
+CATEGORIAS DISPONÍVEIS: ${cats}
+
+TEXTO DA FATURA:
+${txt.slice(0, 6000)}
+
+Retorne APENAS JSON: {"itens":[{"data":"DD/MM","desc":"nome do estabelecimento","valor":99.90,"categoria":"NomeCategoria","parcAtual":1,"parcTotal":1}]}
+Ignore totais, juros, anuidade, encargos e linhas de cabeçalho/rodapé. Detecte parcelamentos no formato "01/03" no final da descrição.`;
+
+    const resposta = await chamarIA(prompt, 'Você extrai lançamentos de faturas de cartão brasileiras. Retorne apenas JSON válido.', 3000);
+    const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    let dados;
+    try { dados = JSON.parse(json); }
+    catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
+
+    parsedItemsFatura = (dados.itens||[]).map(it=>{
+      const cat = DB.categorias.find(c=>c.nome.toLowerCase()===  (it.categoria||'').toLowerCase());
+      const anoAtual = mesAtualCartao().slice(0,4);
+      return {
+        data: it.data, // será convertido na revisão
+        desc: it.desc,
+        valor: it.valor,
+        tipo: 'desp',
+        catId: cat ? cat.id : DB.categorias.find(c=>c.nome==='Outros gastos')?.id,
+        parcAtual: it.parcAtual||1,
+        parcTotal: it.parcTotal||1,
+        nota: ''
+      };
+    });
+    abrirRevisaoFatura();
+  } catch(err){
+    showToast('Erro ao analisar fatura: '+err.message.slice(0,50));
+  }
+}
+
+function abrirRevisaoFatura(){
+  if(!parsedItemsFatura.length){ showToast('Nenhum lançamento encontrado na fatura'); return; }
+  document.getElementById('cartao-step-import').style.display = 'none';
+  document.getElementById('cartao-step-revisao').style.display = '';
+
+  const cartao = DB.cartoes.find(c=>c.id===cartaoImpSelId);
+  document.getElementById('cartaoRevSub').textContent = `${parsedItemsFatura.length} itens · ${cartao?.nome||''}`;
+
+  const cats = DB.categorias.filter(c=>c.tipo==='desp');
+  document.getElementById('cartaoRevList').innerHTML = '<div class="card" style="padding:4px 16px">' + parsedItemsFatura.map((it,i)=>{
+    const cat = DB.categorias.find(c=>c.id===it.catId) || {icone:'💸',nome:'Outros',cor:'#64748b'};
+    const parcInfo = it.parcTotal>1 ? ` · ${it.parcAtual}/${it.parcTotal}` : '';
+    return `<div class="lanc-item">
+      <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
+      <div class="lanc-info">
+        <div class="lanc-desc">${it.desc}</div>
+        <div class="lanc-cat">
+          <select data-idx="${i}" class="_rev-cat-select" style="background:none;border:none;color:var(--mu);font-size:11px;font-family:inherit">
+            ${cats.map(c=>`<option value="${c.id}" ${c.id===it.catId?'selected':''}>${c.icone} ${c.nome}</option>`).join('')}
+          </select>${parcInfo} · ${it.data}
+        </div>
+      </div>
+      <div class="lanc-val desp">-${fmtV(it.valor)}</div>
+    </div>`;
+  }).join('') + '</div>';
+
+  document.querySelectorAll('._rev-cat-select').forEach(sel=>{
+    sel.addEventListener('change', ()=>{ parsedItemsFatura[sel.dataset.idx].catId = sel.value; });
+  });
+}
+
+function confirmarImportacaoFatura(){
+  const mes = mesAtualCartao();
+  if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
+
+  parsedItemsFatura.forEach(it=>{
+    // Converter data DD/MM para AAAA-MM-DD usando o mês de referência atual
+    let dataISO = new Date().toISOString().slice(0,10);
+    if(it.data && it.data.includes('/')){
+      const [dd,mm] = it.data.split('/');
+      dataISO = `${mes.slice(0,4)}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+    }
+    DB.gastosCartao[mes].push({
+      id: 'gc'+Date.now()+Math.random().toString(36).slice(2,7),
+      valor: it.valor,
+      desc: it.desc,
+      catId: it.catId,
+      cartaoId: cartaoImpSelId,
+      data: dataISO,
+      parcAtual: it.parcAtual||1,
+      parcTotal: it.parcTotal||1
+    });
+  });
+
+  dbSave();
+  showToast(`${parsedItemsFatura.length} itens importados ✓`);
+  parsedItemsFatura = [];
+  document.getElementById('cartao-step-revisao').style.display = 'none';
+  document.getElementById('cartao-step-lista').style.display = '';
+  renderCartao();
+}
+
+// ── INSIGHT DE IA PARA CARTÃO ────────────────────────────────────────────────
+async function gerarInsightCartaoIA(){
+  const wrap = document.getElementById('cartao-insight-wrap');
+  if(!wrap) return;
+  const gastos = getGastosCartao();
+  if(!gastos.length){ wrap.innerHTML=''; return; }
+
+  wrap.innerHTML = `<div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:14px;padding:14px;font-size:12px;color:var(--mu)">✨ Gerando dica de economia...</div>`;
+
+  try {
+    const porCategoria = {};
+    gastos.forEach(g=>{
+      const cat = DB.categorias.find(c=>c.id===g.catId);
+      const nome = cat?.nome || 'Outros';
+      porCategoria[nome] = (porCategoria[nome]||0) + g.valor;
+    });
+    const resumo = Object.entries(porCategoria).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${n}: ${fmtV(v)}`).join(', ');
+
+    const prompt = `Gastos no cartão de crédito este mês por categoria: ${resumo}.
+Total: ${fmtV(gastos.reduce((s,g)=>s+g.valor,0))}.
+
+Dê UMA dica curta e prática (máx 2 frases) para economizar no cartão, baseada no maior gasto. Tom direto e acolhedor, em português brasileiro.`;
+
+    const dica = await chamarIA(prompt, 'Você é um consultor financeiro brasileiro direto e prático.', 150);
+    wrap.innerHTML = `<div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:14px;padding:14px">
+      <div style="font-size:11px;font-weight:700;color:#a78bfa;margin-bottom:4px">✨ DICA DO FINIA</div>
+      <div style="font-size:13px;color:var(--tx);line-height:1.5">${dica}</div>
+    </div>`;
+  } catch(err){
+    wrap.innerHTML = '';
+  }
+}
+
+// ── RELATÓRIOS: sub-abas Conta Corrente / Cartão ─────────────────────────────
+let periodModeCartao = 'mes';
+
+function setRelSub(sub){
+  document.getElementById('rel-sub-conta').classList.toggle('active', sub==='conta');
+  document.getElementById('rel-sub-cartao').classList.toggle('active', sub==='cartao');
+  document.getElementById('rel-conta-wrap').style.display  = sub==='conta'  ? '' : 'none';
+  document.getElementById('rel-cartao-wrap').style.display = sub==='cartao' ? '' : 'none';
+  if(sub==='cartao') renderRelCartao();
+}
+
+function setPeriodCartao(p, btn){
+  periodModeCartao = p;
+  document.querySelectorAll('#rel-cartao-wrap .period-tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderRelCartao();
+}
+
+function getMesesCartao(modo){
+  const [y,m] = mesAtualCartao().split('-').map(Number);
+  const meses = [];
+  const qtd = modo==='ano' ? 12 : modo==='trim' ? 3 : 1;
+  for(let i=0;i<qtd;i++){
+    let mm=m-i, yy=y;
+    while(mm<1){ mm+=12; yy--; }
+    meses.push(`${yy}-${String(mm).padStart(2,'0')}`);
+  }
+  return meses;
+}
+
+function renderRelCartao(){
+  const el = document.getElementById('rel-cartao-content');
+  if(!el) return;
+  const meses = getMesesCartao(periodModeCartao);
+  const gastos = meses.flatMap(m=>getGastosCartao(m));
+  const total = gastos.reduce((s,g)=>s+g.valor,0);
+
+  const porCartao = {};
+  gastos.forEach(g=>{ porCartao[g.cartaoId] = (porCartao[g.cartaoId]||0)+g.valor; });
+
+  const porCategoria = {};
+  gastos.forEach(g=>{
+    const cat = DB.categorias.find(c=>c.id===g.catId);
+    const nome = cat?.nome||'Outros';
+    porCategoria[nome] = (porCategoria[nome]||0) + g.valor;
+  });
+  const catsSorted = Object.entries(porCategoria).sort((a,b)=>b[1]-a[1]);
+
+  el.innerHTML = `
+    <div class="card" style="padding:18px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase">Total gasto no cartão</div>
+      <div style="font-size:26px;font-weight:800;font-family:'DM Mono',monospace;color:var(--rd);margin-top:4px">${fmtV(total)}</div>
+      <div style="font-size:11px;color:var(--mu);margin-top:2px">${gastos.length} lançamento${gastos.length!==1?'s':''}</div>
+    </div>
+
+    <div class="section-title">Por cartão</div>
+    <div class="card" style="padding:4px 16px;margin-bottom:14px">
+      ${DB.cartoes.map(c=>{
+        const v = porCartao[c.id]||0;
+        const pct = total>0 ? Math.round(v/total*100) : 0;
+        return `<div style="padding:12px 0;border-bottom:1px solid rgba(51,65,85,.4)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:600">${c.nome}</span>
+            <span style="font-size:13px;font-weight:700;font-family:'DM Mono',monospace">${fmtV(v)}</span>
+          </div>
+          <div style="height:6px;background:var(--s2);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${c.cor}"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section-title">Por categoria</div>
+    <div class="card" style="padding:4px 16px">
+      ${catsSorted.length ? catsSorted.map(([nome,v])=>{
+        const cat = DB.categorias.find(c=>c.nome===nome) || {icone:'💸',cor:'#64748b'};
+        const pct = total>0 ? Math.round(v/total*100) : 0;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(51,65,85,.4)">
+          <div style="font-size:18px">${cat.icone}</div>
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:600">${nome}</span><span style="font-size:13px;font-weight:700;font-family:'DM Mono',monospace">${fmtV(v)}</span></div>
+            <div style="height:5px;background:var(--s2);border-radius:3px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${pct}%;background:${cat.cor}"></div></div>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">Sem gastos no período</div></div>'}
+    </div>`;
 }
 </script>
