@@ -5419,7 +5419,9 @@ REGRAS IMPORTANTES:
         let dados;
         try { dados = JSON.parse(json); }
         catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
-        todosItens = todosItens.concat(dados.itens || []);
+        const itensBloco = dados.itens || [];
+        todosItens = todosItens.concat(itensBloco);
+        console.log(`Bloco ${i+1}/${blocos.length}: ${itensBloco.length} itens, soma R$ ${itensBloco.reduce((s,it)=>s+(it.valor||0),0).toFixed(2)}`);
       } catch(errBloco){
         console.warn('Erro no bloco '+(i+1)+':', errBloco.message);
         blocosComErro++;
@@ -5459,7 +5461,9 @@ REGRAS IMPORTANTES:
     if(totalOficial !== null){
       const totalCapturado = parsedItemsFatura.reduce((s,it)=>s+it.valor, 0);
       const diferenca = totalOficial - totalCapturado;
-      if(Math.abs(diferenca) > 0.01 && Math.abs(diferenca) < totalOficial * 0.5){
+      const percentDiferenca = Math.abs(diferenca) / totalOficial;
+
+      if(Math.abs(diferenca) > 0.01 && percentDiferenca < 0.5){
         const catOutros = DB.categorias.find(c=>c.nome==='Outros gastos');
         const hoje = new Date();
         parsedItemsFatura.push({
@@ -5472,6 +5476,13 @@ REGRAS IMPORTANTES:
           nota: `Ajuste automático para bater com o total oficial da fatura (R$ ${totalOficial.toFixed(2)})`,
           _sel: true
         });
+      } else if(percentDiferenca >= 0.5){
+        // Diferença grande demais para criar ajuste automático com segurança —
+        // provavelmente a IA não conseguiu ler a maior parte da fatura.
+        // Avisamos claramente em vez de silenciosamente capturar pouco.
+        console.warn(`IA capturou apenas R$ ${totalCapturado.toFixed(2)} de R$ ${totalOficial.toFixed(2)} (${(100-percentDiferenca*100).toFixed(0)}%). Ajuste automático bloqueado por segurança.`);
+        statusEl.textContent = `⚠️ IA capturou só R$ ${totalCapturado.toFixed(2)} de R$ ${totalOficial.toFixed(2)}. Tente o parser tradicional (🔍).`;
+        showToast(`⚠️ Captura parcial: R$ ${totalCapturado.toFixed(2)} de R$ ${totalOficial.toFixed(2)}`);
       }
     }
 
