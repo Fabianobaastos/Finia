@@ -2914,7 +2914,7 @@ function parsearFatura(txt){
   // no loop principal. Padrão: "DD/MM ESTABELECIMENTO VALOR_EM_R$" seguido,
   // eventualmente, de uma linha "CIDADE moeda_orig BRL/USD/EUR valor" e
   // "Dólar de Conversão R$ X,XX". Usamos só a 1ª linha (já em R$, valor final).
-  const reLancIntl = /^.{0,4}(\d{2}\/\d{2})\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9 ._*\-]+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})(?:\s{2,}.*)?\s*$/;
+  const reLancIntl = /^.{0,4}(\d{2}\/\d{2})\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9 ._*\-]+?)\s+(-)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})(?:\s{2,}.*)?\s*$/;
   const reIgnorarIntl = /^(data\s+estabelecimento|dólar de conversão|total transaç|repasse de iof|total lançamentos inter|continua\.|PC\s*-|^[A-Z\s]+\d{1,3}(?:[.,]\d{2,3})*\s*(BRL|USD|EUR)\s)/i;
   const itemsIntl = [];
   let dentroSecaoIntl = false;
@@ -2933,8 +2933,10 @@ function parsearFatura(txt){
     if(/\b(BRL|USD|EUR)\b/i.test(l)) continue;
     const mIntl = reLancIntl.exec(l);
     if(!mIntl) continue;
-    const valor = parseFloat(mIntl[3].replace(/\./g,'').replace(',','.'));
+    const negativoIntl = !!mIntl[3];
+    const valor = parseFloat(mIntl[4].replace(/\./g,'').replace(',','.'));
     if(isNaN(valor) || valor <= 0) continue;
+    if(negativoIntl) continue; // estorno/crédito — não é gasto novo
     const desc = mIntl[2].trim();
     if(desc.length < 2) continue;
     itemsIntl.push({data: mIntl[1], desc: cleanDesc(desc) + ' (internacional)', valor});
@@ -3037,8 +3039,23 @@ function parsearFatura(txt){
     });
   }
 
+  // ── DEDUPLICAÇÃO ────────────────────────────────────────────────────────────
+  // Alguns itens podem aparecer tanto na extração internacional quanto na
+  // nacional (linhas de fronteira entre as duas seções, comum em faturas com
+  // muitos portadores). Removemos duplicatas exatas por data+valor+descrição
+  // (ignorando o sufixo " (internacional)"), mantendo a primeira ocorrência.
+  const vistos = new Set();
+  const itemsSemDuplicata = [];
+  for(const it of items){
+    const descBase = it.desc.replace(/\s*\(internacional\)\s*$/i, '').trim().toLowerCase();
+    const chave = `${it.data}|${descBase}|${it.valor.toFixed(2)}`;
+    if(vistos.has(chave)) continue;
+    vistos.add(chave);
+    itemsSemDuplicata.push(it);
+  }
+
   // Filtrar conforme portador selecionado
-  return filtro==='todos' ? items : items.filter(i=>i._sel);
+  return filtro==='todos' ? itemsSemDuplicata : itemsSemDuplicata.filter(i=>i._sel);
 }
 
 // ── RECATEGORIZAÇÃO POR IA (lote, pós-import) ────────────────────────────────
