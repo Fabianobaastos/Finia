@@ -2898,8 +2898,9 @@ function parsearFatura(txt){
   const rePortador = /^[^(]*\(final\s*(\d{4})\)/;
   const reNomePort = /^([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇa-záéíóúâêîôûãõç\s]{2,})\s*\(final\s*(\d{4})\)\s*$/;
 
-  // Lançamento: [prefixo_opcional] DD/MM ESTABELECIMENTO VALOR
-  const reLanc = /^.{0,4}(\d{2}\/\d{2})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
+  // Lançamento: [prefixo_opcional] DD/MM ESTABELECIMENTO [-] VALOR
+  // O hífen antes do valor indica estorno/crédito (valor negativo)
+  const reLanc = /^.{0,4}(\d{2}\/\d{2})\s+(.+?)\s+(-)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
 
   // Categoria (linha após lançamento — ignorar)
   const reCat = /^(ALIMENTA[ÇC]|TURISMO|DIVERSOS|SA[ÚU]DE|VESTU[ÁA]RIO|VE[ÍI]CULOS|MORADIA|EDUCA[ÇC]|HOBBY|OUTROS|SAO |SAN |LONDON|ZURICH|MOUNTAIN|CURITIBA|FLORIANOPOLIS|PALHOCA|OSASCO|BELO|BRASILIA|Palhoca|Palhoa|Osasco|Sao Paulo|Barueri|Contagem|Alexandria|Curitiba|Rio do Sul)/i;
@@ -2916,16 +2917,25 @@ function parsearFatura(txt){
   // "27/05 Cloudpark 20,00  16/06 Cloudpark 25,00"
   // Detectamos esse padrão (duas ocorrências de DD/MM...valor na mesma linha,
   // separadas por 2+ espaços) e quebramos em duas linhas antes do loop principal.
-  const reDoisLanc = /^(.{0,4}\d{2}\/\d{2}\s+.+?\s+\d{1,3}(?:\.\d{3})*,\d{2})\s{2,}(\d{2}\/\d{2}\s+.+?\s+\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
+  const reDoisLanc = /^(.{0,4}\d{2}\/\d{2}\s+.+?\s+-?\s*\d{1,3}(?:\.\d{3})*,\d{2})\s{2,}(\d{2}\/\d{2}\s+.+?\s+-?\s*\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
+  // Caso a coluna esquerda seja um lançamento mas a direita seja texto de rodapé
+  // (ex: "19/06 PG *X - 150,46  Total transações inter. em R$ 44,12"), descartamos
+  // só a parte direita e mantemos a esquerda intacta.
+  const reLancMaisLixo = /^(.{0,4}\d{2}\/\d{2}\s+.+?\s+-?\s*\d{1,3}(?:\.\d{3})*,\d{2})\s{2,}(Total\s|Repasse\s|Lançamentos\s)/i;
   const linesExpandidas = [];
   for(const l of lines){
     const mDois = reDoisLanc.exec(l);
     if(mDois){
       linesExpandidas.push(mDois[1].trim());
       linesExpandidas.push(mDois[2].trim());
-    } else {
-      linesExpandidas.push(l);
+      continue;
     }
+    const mLixo = reLancMaisLixo.exec(l);
+    if(mLixo){
+      linesExpandidas.push(mLixo[1].trim());
+      continue;
+    }
+    linesExpandidas.push(l);
   }
 
   for(const l of linesExpandidas){
@@ -2954,12 +2964,15 @@ function parsearFatura(txt){
     const m = reLanc.exec(l);
     if(!m) continue;
 
-    const data  = m[1];
-    const desc  = m[2].trim();
-    const valor = parseFloat(m[3].replace(/\./g,'').replace(',','.'));
+    const data    = m[1];
+    const desc    = m[2].trim();
+    const negativo = !!m[3]; // hífen antes do valor = estorno/crédito
+    const valor   = parseFloat(m[4].replace(/\./g,'').replace(',','.'));
 
     if(isNaN(valor) || valor <= 0) continue;
     if(desc.length < 2) continue;
+    // Estornos (valores negativos na fatura) não são gastos novos — ignorar
+    if(negativo) continue;
 
     // Detectar parcela: "JM INFORMATICA 02/02" → 2ª de 2
     const mParc    = desc.match(/\s+(\d{2})\/(\d{2})\s*$/);
