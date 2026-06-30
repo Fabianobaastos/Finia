@@ -2908,6 +2908,45 @@ function parsearFatura(txt){
   // Linhas de cabeçalho/rodapé a ignorar
   const reIgnorar = /^(data$|estabelecimento$|valor em r\$|continua\.|PC\s*-|4004|0800|postagem|vencimento|emissão|o total|com vencimento|pagamento\s+(efetuado|mínimo|obrigatório)|parcelas fixas|juros|iof|cet|banco|número do|nome do|endereço|instruções|local de|sacador|data do|uso do|espécie|aceite|nosso número|total desta|saldo financ|total da fatura|previsão|repasse de iof|total lanç|lançamentos produtos|total dos lanç|compras parceladas|próxima fatura|demais faturas|total para próximas|limites de créd|limite total|limite disp|limite máx|encargos cobrados|juros do rot|juros de mora|multa|novo teto|simulação|valor compra|valor do iof|valor total fin|valor juros|quantidade|valor da parc|valor total a pagar|de retirada|de pagamento|dólar de conv|total transaç|lançamentos inter|lançamentos no cartão|anuidade|estorno de anuidade|titular\s+\d)/i;
 
+  // ── LANÇAMENTOS INTERNACIONAIS ────────────────────────────────────────────
+  // Na fatura Itaú, essa seção vem misturada em colunas com "Compras parceladas"
+  // (que aciona o reParar), então precisamos capturá-la ANTES de aplicar o reParar
+  // no loop principal. Padrão: "DD/MM ESTABELECIMENTO VALOR_EM_R$" seguido,
+  // eventualmente, de uma linha "CIDADE moeda_orig BRL/USD/EUR valor" e
+  // "Dólar de Conversão R$ X,XX". Usamos só a 1ª linha (já em R$, valor final).
+  const reLancIntl = /^.{0,4}(\d{2}\/\d{2})\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9 ._*\-]+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})(?:\s{2,}.*)?\s*$/;
+  const reIgnorarIntl = /^(data\s+estabelecimento|dólar de conversão|total transaç|repasse de iof|total lançamentos inter|continua\.|PC\s*-|^[A-Z\s]+\d{1,3}(?:[.,]\d{2,3})*\s*(BRL|USD|EUR)\s)/i;
+  const itemsIntl = [];
+  let dentroSecaoIntl = false;
+  let viuPrimeiraSecaoIntl = false;
+  for(const l of lines){
+    if(/Lançamentos internacionais/i.test(l)){ dentroSecaoIntl = true; viuPrimeiraSecaoIntl = true; continue; }
+    // Só sair definitivamente da seção internacional ao bater no rodapé final
+    // da fatura (simulações de juros, parcelamento) — essas seções vêm DEPOIS
+    // de todos os lançamentos internacionais possíveis.
+    if(/Novo teto de juros|Simulação de Compras|Simulação Saque Cash|FABIANO ISAIAS DE OLIVEIRA BASTOS,$/i.test(l)){
+      dentroSecaoIntl = false;
+    }
+    if(!dentroSecaoIntl) continue;
+    if(reIgnorarIntl.test(l)) continue;
+    // Pular linhas que são claramente "cidade + moeda original" (têm BRL/USD/EUR)
+    if(/\b(BRL|USD|EUR)\b/i.test(l)) continue;
+    const mIntl = reLancIntl.exec(l);
+    if(!mIntl) continue;
+    const valor = parseFloat(mIntl[3].replace(/\./g,'').replace(',','.'));
+    if(isNaN(valor) || valor <= 0) continue;
+    const desc = mIntl[2].trim();
+    if(desc.length < 2) continue;
+    itemsIntl.push({data: mIntl[1], desc: cleanDesc(desc) + ' (internacional)', valor});
+  }
+  itemsIntl.forEach(it=>{
+    items.push({
+      data: it.data, desc: it.desc, valor: it.valor, tipo: 'desp',
+      catId: autoCat(it.desc, 'desp'), parcAtual: 1, parcTotal: 1,
+      nota: 'Lançamento internacional', _sel: true
+    });
+  });
+
   // Usar o FINAL do cartão como chave única do portador (mais confiável que o nome)
   let titularFinal = '';  // primeiro final visto = titular
   let secao        = 'desconhecido';
