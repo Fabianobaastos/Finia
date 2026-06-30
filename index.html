@@ -5352,36 +5352,118 @@ async function rodarParserFaturaIA(){
   showToast('✨ Analisando fatura com IA...');
   try {
     const cats = DB.categorias.filter(c=>c.tipo==='desp').map(c=>c.nome).join(', ');
-    const prompt = `Extraia todos os lançamentos desta fatura de cartão de crédito brasileira.
+
+    // Extrair total oficial da fatura (mesmo mecanismo do parser tradicional)
+    // — usado depois para criar um lançamento de ajuste se necessário.
+    let totalOficial = null;
+    const padroesTotal = [
+      /total\s+desta\s+fatura\s+r?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+      /o\s+total\s+da\s+sua\s+fatura\s+é:?\s*r?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+      /total\s+(dos\s+lançamentos\s+atuais|a\s+pagar|da\s+fatura)\s*:?\s*r?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+      /valor\s+total\s+da\s+fatura\s*:?\s*r?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2})/i,
+    ];
+    for(const padrao of padroesTotal){
+      const m = padrao.exec(txt);
+      if(m){
+        const valorStr = m[m.length-1]; // último grupo capturado é sempre o valor
+        totalOficial = parseFloat(valorStr.replace(/\./g,'').replace(',','.'));
+        break;
+      }
+    }
+
+    // Processar em blocos — texto completo, sem cortar. Faturas longas
+    // (múltiplos portadores, várias páginas) precisam de vários lotes para
+    // não estourar o limite de tokens de saída da IA.
+    const TAMANHO_BLOCO = 8000; // caracteres de texto da fatura por chamada
+    const blocos = [];
+    for(let i=0; i<txt.length; i+=TAMANHO_BLOCO){
+      blocos.push(txt.slice(i, i+TAMANHO_BLOCO));
+    }
+
+    let todosItens = [];
+    for(let i=0; i<blocos.length; i++){
+      if(blocos.length > 1) showToast(`✨ Analisando parte ${i+1}/${blocos.length}...`);
+
+      const prompt = `Extraia TODOS os lançamentos de compra/saque desta PARTE de uma fatura de cartão de crédito brasileira (pode haver múltiplos portadores/cartões adicionais — extraia de todos).
 
 CATEGORIAS DISPONÍVEIS: ${cats}
 
-TEXTO DA FATURA:
-${txt.slice(0, 6000)}
+TEXTO DA FATURA (parte ${i+1} de ${blocos.length}):
+${blocos[i]}
 
 Retorne APENAS JSON: {"itens":[{"data":"DD/MM","desc":"nome do estabelecimento","valor":99.90,"categoria":"NomeCategoria","parcAtual":1,"parcTotal":1}]}
-Ignore totais, juros, anuidade, encargos e linhas de cabeçalho/rodapé. Detecte parcelamentos no formato "01/03" no final da descrição.`;
 
-    const resposta = await chamarIA(prompt, 'Você extrai lançamentos de faturas de cartão brasileiras. Retorne apenas JSON válido.', 3000);
-    const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    let dados;
-    try { dados = JSON.parse(json); }
-    catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
+REGRAS IMPORTANTES:
+- Ignore totais, subtotais, juros, encargos, IOF, limites de crédito e linhas de cabeçalho/rodapé
+- Ignore anuidades que tenham um estorno correspondente na mesma fatura (se cobrança e estorno aparecem, ambos se anulam — não inclua nenhum dos dois)
+- Ignore qualquer linha com valor negativo ou marcada como estorno/crédito/devolução — não são gastos novos
+- Detecte parcelamentos no formato "01/03" no final da descrição (parcAtual/parcTotal)
+- Lançamentos internacionais (em moeda estrangeira convertida para R$) também devem ser incluídos — use o valor já em reais
+- Se não conseguir identificar a categoria, use "Outros gastos"
+- Esta é apenas uma PARTE do documento — pode haver lançamentos cortados no início ou fim deste trecho; ignore linhas incompletas que não tenham data+valor claros`;
 
-    parsedItemsFatura = (dados.itens||[]).map(it=>{
-      const cat = DB.categorias.find(c=>c.nome.toLowerCase()===  (it.categoria||'').toLowerCase());
-      const anoAtual = mesAtualCartao().slice(0,4);
+      try {
+        const resposta = await chamarIA(prompt, 'Você extrai lançamentos de faturas de cartão de crédito brasileiras de qualquer banco. Retorne apenas JSON válido, sem markdown.', 4000);
+        const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        let dados;
+        try { dados = JSON.parse(json); }
+        catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
+        todosItens = todosItens.concat(dados.itens || []);
+      } catch(errBloco){
+        console.warn('Erro no bloco '+(i+1)+':', errBloco.message);
+        // Continua processando os outros blocos mesmo se um falhar
+      }
+    }
+
+    parsedItemsFatura = todosItens.map(it=>{
+      const cat = DB.categorias.find(c=>c.nome.toLowerCase() === (it.categoria||'').toLowerCase());
       return {
-        data: it.data, // será convertido na revisão
+        data: it.data,
         desc: it.desc,
         valor: it.valor,
         tipo: 'desp',
         catId: cat ? cat.id : DB.categorias.find(c=>c.nome==='Outros gastos')?.id,
         parcAtual: it.parcAtual||1,
         parcTotal: it.parcTotal||1,
-        nota: ''
+        nota: '',
+        _sel: true
       };
+    }).filter(it => it.valor && it.valor > 0 && it.desc && it.desc.length > 1);
+
+    // Deduplicar itens repetidos por engano entre blocos sobrepostos
+    const vistos = new Set();
+    parsedItemsFatura = parsedItemsFatura.filter(it=>{
+      const chave = `${it.data}|${it.desc.toLowerCase().trim()}|${it.valor.toFixed(2)}`;
+      if(vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
     });
+
+    // Lançamento de ajuste — mesma rede de segurança do parser tradicional
+    if(totalOficial !== null){
+      const totalCapturado = parsedItemsFatura.reduce((s,it)=>s+it.valor, 0);
+      const diferenca = totalOficial - totalCapturado;
+      if(Math.abs(diferenca) > 0.01 && Math.abs(diferenca) < totalOficial * 0.5){
+        const catOutros = DB.categorias.find(c=>c.nome==='Outros gastos');
+        const hoje = new Date();
+        parsedItemsFatura.push({
+          data: `${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}`,
+          desc: 'Outros (ajuste de fatura)',
+          valor: Math.abs(diferenca),
+          tipo: 'desp',
+          catId: catOutros?.id,
+          parcAtual: 1, parcTotal: 1,
+          nota: `Ajuste automático para bater com o total oficial da fatura (R$ ${totalOficial.toFixed(2)})`,
+          _sel: true
+        });
+      }
+    }
+
+    if(!parsedItemsFatura.length){
+      showToast('Nenhum lançamento identificado pela IA. Tente o parser tradicional.');
+      return;
+    }
+
     abrirRevisaoFatura();
   } catch(err){
     showToast('Erro ao analisar fatura: '+err.message.slice(0,50));
