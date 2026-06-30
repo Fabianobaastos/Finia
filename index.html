@@ -710,6 +710,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="period-tab" onclick="setPeriod('trim',this)">Trimestre</button>
         <button class="period-tab" onclick="setPeriod('ano',this)">Ano</button>
       </div>
+      <button id="btn-analise-conta" onclick="gerarAnaliseCompletaRel('conta')" style="width:100%;margin:14px 0;padding:13px;border-radius:14px;border:1.5px solid #6366f1;background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(167,139,250,.08));color:#a78bfa;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+        ✨ Gerar análise completa com IA
+      </button>
+      <div id="rel-analise-conta" style="display:none;margin-bottom:16px"></div>
       <div id="rel-content"></div>
     </div>
     <div id="rel-cartao-wrap" style="display:none">
@@ -718,6 +722,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="period-tab" onclick="setPeriodCartao('trim',this)">Trimestre</button>
         <button class="period-tab" onclick="setPeriodCartao('ano',this)">Ano</button>
       </div>
+      <button id="btn-analise-cartao" onclick="gerarAnaliseCompletaRel('cartao')" style="width:100%;margin:14px 0;padding:13px;border-radius:14px;border:1.5px solid #6366f1;background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(167,139,250,.08));color:#a78bfa;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+        ✨ Gerar análise completa com IA
+      </button>
+      <div id="rel-analise-cartao" style="display:none;margin-bottom:16px"></div>
       <div id="rel-cartao-content"></div>
     </div>
   </div>
@@ -3689,6 +3697,9 @@ document.querySelectorAll('#ob-banco-chips .chip').forEach(c=>{
   <div class="ai-chat-messages" id="ai-chat-messages">
     <!-- Mensagens adicionadas via JS -->
   </div>
+  <div id="ai-chat-sugestoes" style="padding:0 16px 8px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none">
+    <button onclick="document.getElementById('ai-chat-input').value='Onde posso economizar?';enviarMensagem()" style="flex-shrink:0;padding:8px 14px;border-radius:20px;border:1.5px solid var(--bd);background:var(--s2);color:var(--mu);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap">💡 Onde economizar?</button>
+  </div>
   <div class="ai-chat-input-wrap">
     <textarea class="ai-chat-input" id="ai-chat-input" rows="1"
       placeholder="Pergunte sobre seus gastos..."
@@ -3737,6 +3748,19 @@ function gerarContextoIA(){
 
   const saldoAtual = typeof calcularSaldoAtual === 'function' ? calcularSaldoAtual() : null;
 
+  // Top 25 maiores lançamentos individuais dos últimos 6 meses — permite à IA
+  // identificar anomalias (ex: item categorizado errado, gasto atípico)
+  // que um resumo agregado por categoria não revela.
+  const todosLancs = meses.flatMap(ym => DB.lancamentos[ym] || []);
+  const maioresLancs = [...todosLancs]
+    .filter(l=>l.tipo==='desp')
+    .sort((a,b)=>b.valor-a.valor)
+    .slice(0,25)
+    .map(l=>{
+      const cat = DB.categorias.find(c=>c.id===l.catId);
+      return `R$${l.valor.toFixed(2)} | ${l.desc} | cat: ${cat?.nome||'?'} | ${l.data}`;
+    }).join('\n');
+
   return `DADOS FINANCEIROS DO USUÁRIO (${DB.user?.nome||'usuário'}):
 Saldo atual em conta: ${saldoAtual !== null ? 'R$'+saldoAtual.toFixed(2) : 'não informado'}
 Mês atual: ${currentMes}
@@ -3744,9 +3768,14 @@ Mês atual: ${currentMes}
 HISTÓRICO (últimos 6 meses):
 ${resumoMeses}
 
+TOP 25 MAIORES LANÇAMENTOS INDIVIDUAIS (últimos 6 meses) — use isto para identificar possíveis erros de categorização (ex: uma transferência pessoal categorizada como "Transporte" por engano) ou gastos atípicos que merecem atenção:
+${maioresLancs}
+
 PARCELAMENTOS ATIVOS: ${parcelados.length > 0 ? parcelados.slice(0,8).join('; ') : 'nenhum'}
 
-CATEGORIAS DISPONÍVEIS: ${DB.categorias.map(c=>c.nome).join(', ')}`;
+CATEGORIAS DISPONÍVEIS: ${DB.categorias.map(c=>c.nome).join(', ')}
+
+OBSERVAÇÃO IMPORTANTE: estes dados são da CONTA CORRENTE apenas. Gastos no cartão de crédito são controlados separadamente e não afetam este saldo — apenas o pagamento da fatura aparece aqui como uma despesa única.`;
 }
 
 // ── Chamada à API via proxy ───────────────────────────────────────────────────
@@ -3838,6 +3867,39 @@ function adicionarMensagemChat(tipo, texto, isLoading = false){
   return div;
 }
 
+async function solicitarAnaliseCompleta(){
+  if(iaSendindo) return;
+  const msgUsuario = '📊 Faça uma análise completa dos meus gastos dos últimos meses (conta corrente) e me dê dicas para melhorar.';
+
+  iaSendindo = true;
+  document.getElementById('ai-send-btn').disabled = true;
+
+  adicionarMensagemChat('user', msgUsuario);
+  chatHistorico.push({role:'user', content: msgUsuario});
+
+  const loadingEl = adicionarMensagemChat('ai', '...', true);
+
+  try {
+    const contexto  = gerarContextoIA();
+    const sistemMsg = `Você é um consultor financeiro pessoal integrado ao app Finia, agindo com a profundidade de uma análise humana completa — não uma resposta superficial. Estruture sua resposta como um relatório direto e prático, cobrindo: (1) o quadro geral (receitas, despesas, saldo do período), (2) onde o dinheiro está indo (maiores categorias e padrões mês a mês), (3) qualquer anomalia ou possível erro de categorização que você notar nos lançamentos individuais fornecidos, (4) de 3 a 4 recomendações práticas e específicas baseadas nos dados reais — não genéricas. Use **negrito** para valores importantes. Tom direto, acolhedor e sem jargão técnico. Responda em português brasileiro.\n\n${contexto}`;
+
+    const resposta = await chamarIA(
+      `Usuário: ${msgUsuario}\n\nAssistente:`,
+      sistemMsg, 1400
+    );
+
+    if(loadingEl) loadingEl.remove();
+    adicionarMensagemChat('ai', resposta);
+    chatHistorico.push({role:'assistant', content: resposta});
+
+  } catch(err) {
+    if(loadingEl){ loadingEl.textContent = '⚠️ Erro ao conectar. Verifique sua conexão.'; loadingEl.classList.remove('loading'); }
+  } finally {
+    iaSendindo = false;
+    document.getElementById('ai-send-btn').disabled = false;
+  }
+}
+
 async function enviarMensagem(){
   const input = document.getElementById('ai-chat-input');
   const msg = input?.value?.trim();
@@ -3864,7 +3926,7 @@ async function enviarMensagem(){
 
     const resposta = await chamarIA(
       `${hist}\n\nUsuário: ${msg}\n\nAssistente:`,
-      sistemMsg, 600
+      sistemMsg, 1000
     );
 
     if(loadingEl) loadingEl.remove();
@@ -5816,5 +5878,105 @@ function renderRelCartao(){
         </div>`;
       }).join('') : '<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">Sem gastos no período</div></div>'}
     </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ANÁLISE COMPLETA COM IA — direto na aba Relatórios
+// ══════════════════════════════════════════════════════════════════════════════
+
+function gerarContextoIACartao(){
+  const meses = Object.keys(DB.gastosCartao || {}).sort().slice(-6);
+  const resumoMeses = meses.map(ym => {
+    const gastos = DB.gastosCartao[ym] || [];
+    const total  = gastos.reduce((s,g)=>s+g.valor,0);
+    const cats   = {};
+    gastos.forEach(g=>{
+      const cat = DB.categorias.find(c=>c.id===g.catId);
+      const nome = cat?.nome || 'Outros';
+      cats[nome] = (cats[nome]||0) + g.valor;
+    });
+    const topCats = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5)
+      .map(([n,v])=>`${n}: R$${v.toFixed(0)}`).join(', ');
+    const porCartao = {};
+    gastos.forEach(g=>{
+      const cartao = DB.cartoes.find(c=>c.id===g.cartaoId);
+      const nome = cartao?.nome || '?';
+      porCartao[nome] = (porCartao[nome]||0) + g.valor;
+    });
+    const cartoesStr = Object.entries(porCartao).map(([n,v])=>`${n}: R$${v.toFixed(0)}`).join(', ');
+    return `${ym}: total R$${total.toFixed(0)} | por categoria: ${topCats} | por cartão: ${cartoesStr}`;
+  }).join('\n');
+
+  const todosGastos = meses.flatMap(ym => DB.gastosCartao[ym] || []);
+  const maioresGastos = [...todosGastos]
+    .sort((a,b)=>b.valor-a.valor)
+    .slice(0,25)
+    .map(g=>{
+      const cat = DB.categorias.find(c=>c.id===g.catId);
+      const cartao = DB.cartoes.find(c=>c.id===g.cartaoId);
+      return `R$${g.valor.toFixed(2)} | ${g.desc} | cat: ${cat?.nome||'?'} | cartão: ${cartao?.nome||'?'} | ${g.data}`;
+    }).join('\n');
+
+  return `DADOS DE CARTÃO DE CRÉDITO DO USUÁRIO (${DB.user?.nome||'usuário'}):
+Cartões cadastrados: ${(DB.cartoes||[]).map(c=>c.nome).join(', ')}
+
+HISTÓRICO (últimos 6 meses):
+${resumoMeses || 'nenhum gasto registrado ainda'}
+
+TOP 25 MAIORES GASTOS INDIVIDUAIS NO CARTÃO:
+${maioresGastos || 'nenhum'}
+
+CATEGORIAS DISPONÍVEIS: ${DB.categorias.filter(c=>c.tipo==='desp').map(c=>c.nome).join(', ')}
+
+OBSERVAÇÃO IMPORTANTE: estes são gastos no CARTÃO DE CRÉDITO, controlados separadamente da conta corrente. Eles não afetam o saldo em conta — apenas o pagamento da fatura (quando ocorre) aparece na conta corrente como uma despesa única.`;
+}
+
+async function gerarAnaliseCompletaRel(tipo){
+  if(!isPro()){ showUpgradeModal('Análise completa com IA é exclusiva do plano Pro.\n\nReceba um relatório detalhado dos seus gastos com recomendações personalizadas.'); return; }
+
+  const btn = document.getElementById(tipo==='conta' ? 'btn-analise-conta' : 'btn-analise-cartao');
+  const wrap = document.getElementById(tipo==='conta' ? 'rel-analise-conta' : 'rel-analise-cartao');
+  if(!btn || !wrap) return;
+
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  const textoOriginal = btn.innerHTML;
+  btn.innerHTML = '⏳ Analisando seus dados...';
+
+  wrap.style.display = '';
+  wrap.innerHTML = `<div style="background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:18px;font-size:13px;color:var(--mu);text-align:center">✨ Gerando sua análise personalizada...</div>`;
+
+  try {
+    const contexto = tipo === 'conta' ? gerarContextoIA() : gerarContextoIACartao();
+    const assunto  = tipo === 'conta' ? 'da conta corrente' : 'do cartão de crédito';
+
+    const sistemMsg = `Você é um consultor financeiro pessoal integrado ao app Finia, agindo com a profundidade de uma análise humana completa — não uma resposta superficial. Estruture sua resposta como um relatório direto e prático cobrindo: (1) o quadro geral (totais e padrões do período), (2) onde o dinheiro está indo (maiores categorias e padrões mês a mês), (3) qualquer anomalia ou possível erro de categorização que você notar nos lançamentos individuais fornecidos, (4) de 3 a 4 recomendações práticas e específicas baseadas nos dados reais — não genéricas. Use **negrito** para valores importantes. Tom direto, acolhedor e sem jargão técnico. Responda em português brasileiro, em formato de texto corrido com parágrafos (não use markdown de cabeçalhos #, apenas **negrito**).\n\n${contexto}`;
+
+    const resposta = await chamarIA(
+      `Faça uma análise completa ${assunto} e me dê dicas práticas para melhorar.`,
+      sistemMsg, 1400
+    );
+
+    const respostaHtml = resposta
+      .replace(/\*\*(.+?)\*\*/g,'<strong style="color:var(--tx)">$1</strong>')
+      .replace(/\n\n/g,'</p><p style="margin-top:12px">')
+      .replace(/\n/g,'<br>');
+
+    wrap.innerHTML = `
+      <div style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(167,139,250,.04));border:1px solid rgba(99,102,241,.25);border-radius:16px;padding:18px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <div style="font-size:18px">✨</div>
+          <div style="font-size:13px;font-weight:700;color:#a78bfa">Análise do Finia</div>
+          <button onclick="gerarAnaliseCompletaRel('${tipo}')" style="margin-left:auto;background:none;border:none;color:var(--mu);font-size:11px;cursor:pointer;text-decoration:underline">🔄 Gerar de novo</button>
+        </div>
+        <div style="font-size:13px;line-height:1.7;color:var(--tx)"><p>${respostaHtml}</p></div>
+      </div>`;
+  } catch(err){
+    wrap.innerHTML = `<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:16px;padding:16px;font-size:13px;color:#f87171">⚠️ Erro ao gerar análise: ${err.message.slice(0,100)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.innerHTML = textoOriginal;
+  }
 }
 </script>
