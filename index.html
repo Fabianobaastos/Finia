@@ -5306,7 +5306,9 @@ function abrirRevisaoFatura(){
   document.getElementById('cartao-step-revisao').style.display = '';
 
   const cartao = DB.cartoes.find(c=>c.id===cartaoImpSelId);
-  document.getElementById('cartaoRevSub').textContent = `${parsedItemsFatura.length} itens · ${cartao?.nome||''}`;
+  const totalFatura = parsedItemsFatura.reduce((s,it)=>s+it.valor,0);
+  document.getElementById('cartaoRevSub').innerHTML = `${parsedItemsFatura.length} itens · ${cartao?.nome||''} · <strong style="color:var(--rd)">${fmtV(totalFatura)}</strong>
+    <button onclick="copiarDebugFatura()" style="margin-left:8px;font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);background:var(--s2);color:var(--mu);cursor:pointer">📋 Copiar lista p/ debug</button>`;
 
   const cats = DB.categorias.filter(c=>c.tipo==='desp');
   document.getElementById('cartaoRevList').innerHTML = '<div class="card" style="padding:4px 16px">' + parsedItemsFatura.map((it,i)=>{
@@ -5328,6 +5330,22 @@ function abrirRevisaoFatura(){
 
   document.querySelectorAll('._rev-cat-select').forEach(sel=>{
     sel.addEventListener('change', ()=>{ parsedItemsFatura[sel.dataset.idx].catId = sel.value; });
+  });
+}
+
+function copiarDebugFatura(){
+  const linhas = parsedItemsFatura.map(it => `${it.data}\t${it.desc}\t${it.valor.toFixed(2)}`);
+  const total = parsedItemsFatura.reduce((s,it)=>s+it.valor,0);
+  const texto = `TOTAL: ${total.toFixed(2)} (${parsedItemsFatura.length} itens)\n\n` + linhas.join('\n');
+  navigator.clipboard?.writeText(texto).then(()=>{
+    showToast('📋 Lista copiada! Cole no chat com o Claude.');
+  }).catch(()=>{
+    // Fallback: mostrar em um textarea selecionável
+    const modal = document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML = `<textarea style="width:100%;height:80vh;background:#1e293b;color:#fff;border-radius:12px;padding:16px;font-family:monospace;font-size:11px" readonly>${texto}</textarea>`;
+    modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+    document.body.appendChild(modal);
   });
 }
 
