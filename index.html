@@ -2328,74 +2328,58 @@ async function doExtract(file){
       const page    = await pdf.getPage(p);
       const content = await page.getTextContent();
 
-      // Detectar colunas: agrupar todos os itens da página por posição X
-      // para identificar se há 2 colunas de lançamentos lado a lado
-      const allX = content.items.filter(i=>i.str && i.str.trim()).map(i=>i.transform[4]);
-      let colSplitX = null;
-      if(allX.length > 10){
-        // Detectar gap bimodal no eixo X — sinal de duas colunas de texto
-        const sorted = [...new Set(allX.map(x=>Math.round(x)))].sort((a,b)=>a-b);
-        let maiorGap = 0, gapX = null;
-        for(let i=1;i<sorted.length;i++){
-          const gap = sorted[i]-sorted[i-1];
-          if(gap > maiorGap){ maiorGap = gap; gapX = (sorted[i]+sorted[i-1])/2; }
-        }
-        // Só considerar como 2 colunas se o gap for realmente grande (>80pt)
-        // e houver conteúdo substancial dos dois lados
-        if(maiorGap > 80){
-          const esquerda = allX.filter(x=>x < gapX).length;
-          const direita  = allX.filter(x=>x >= gapX).length;
-          if(esquerda > allX.length*0.15 && direita > allX.length*0.15){
-            colSplitX = gapX;
-          }
-        }
-      }
-
-      // Função para processar um conjunto de itens (uma coluna) em linhas de texto
-      const processarColuna = (itemsCol) => {
-        const byY = {};
-        itemsCol.forEach(item=>{
-          const y = Math.round(item.transform[5] / 2) * 2;
-          if(!byY[y]) byY[y] = [];
-          byY[y].push({ x:item.transform[4], str:item.str, w:item.width||0 });
+      // Agrupar itens por linha (Y arredondado com tolerância de 2px)
+      const byY = {};
+      content.items.forEach(item=>{
+        if(!item.str) return;
+        const y = Math.round(item.transform[5] / 2) * 2; // tolerância 2px
+        if(!byY[y]) byY[y] = [];
+        byY[y].push({
+          x:   item.transform[4],
+          str: item.str,
+          w:   item.width || 0
         });
-        const linhas = [];
-        Object.keys(byY).sort((a,b)=>b-a).forEach(y=>{
-          const itens = byY[y].sort((a,b)=>a.x-b.x);
-          if(!itens.length) return;
-          let linha = '', prevEndX = null;
-          itens.forEach(item=>{
-            const s = item.str; if(!s) return;
+      });
+
+      // Para cada linha Y, separar em "clusters" de X quando há um gap muito grande
+      // (indica colunas paralelas na mesma altura — comum em faturas com 2 portadores
+      // lado a lado). Cada cluster se torna uma linha de texto própria, na ordem
+      // esquerda-para-direita, mas cada cluster fica em sua própria linha do txt final
+      // (não concatenado), preservando a estrutura DD/MM ESTABELECIMENTO VALOR intacta.
+      Object.keys(byY).sort((a,b)=>b-a).forEach(y=>{
+        const itens = byY[y].sort((a,b)=>a.x-b.x);
+        if(!itens.length) return;
+
+        // Detectar clusters por gap grande (>60pt = nova coluna, não apenas espaço)
+        const clusters = [[]];
+        let prevEndX = null;
+        itens.forEach(item=>{
+          const s = item.str; if(!s) return;
+          const startX = item.x, endX = startX + (item.w || s.length*6);
+          if(prevEndX !== null && (startX - prevEndX) > 60){
+            clusters.push([]); // gap muito grande = nova coluna na mesma linha Y
+          }
+          clusters[clusters.length-1].push(item);
+          prevEndX = endX;
+        });
+
+        clusters.forEach(cluster=>{
+          if(!cluster.length) return;
+          let linha = '', pEndX = null;
+          cluster.forEach(item=>{
+            const s = item.str;
             const startX = item.x, endX = startX + (item.w || s.length*6);
-            if(prevEndX === null) linha += s;
+            if(pEndX === null) linha += s;
             else {
-              const gap = startX - prevEndX;
+              const gap = startX - pEndX;
               linha += gap>20 ? '  '+s : gap>3 ? ' '+s : s;
             }
-            prevEndX = endX;
+            pEndX = endX;
           });
           const l = linha.trim();
-          if(l) linhas.push({y: parseFloat(y), texto: l});
+          if(l) txt += l + '\n';
         });
-        return linhas;
-      };
-
-      const itensValidos = content.items.filter(i=>i.str && i.str.trim());
-
-      if(colSplitX !== null){
-        // Processar colunas separadamente, mantendo ordem top-to-bottom de cada uma,
-        // mas emitindo coluna esquerda completa primeiro, depois direita
-        // (evita misturar lançamentos de portadores diferentes em colunas paralelas)
-        const colEsq = itensValidos.filter(i=>i.transform[4] < colSplitX);
-        const colDir = itensValidos.filter(i=>i.transform[4] >= colSplitX);
-        const linhasEsq = processarColuna(colEsq);
-        const linhasDir = processarColuna(colDir);
-        linhasEsq.forEach(l => txt += l.texto + '\n');
-        linhasDir.forEach(l => txt += l.texto + '\n');
-      } else {
-        const linhas = processarColuna(itensValidos);
-        linhas.forEach(l => txt += l.texto + '\n');
-      }
+      });
     }
 
     document.getElementById('iTextoRaw').value = txt;
@@ -5137,63 +5121,41 @@ async function doExtractFatura(file){
     for(let p=1; p<=pdf.numPages; p++){
       const page = await pdf.getPage(p);
       const content = await page.getTextContent();
-
-      const allX = content.items.filter(i=>i.str && i.str.trim()).map(i=>i.transform[4]);
-      let colSplitX = null;
-      if(allX.length > 10){
-        const sorted = [...new Set(allX.map(x=>Math.round(x)))].sort((a,b)=>a-b);
-        let maiorGap = 0, gapX = null;
-        for(let i=1;i<sorted.length;i++){
-          const gap = sorted[i]-sorted[i-1];
-          if(gap > maiorGap){ maiorGap = gap; gapX = (sorted[i]+sorted[i-1])/2; }
-        }
-        if(maiorGap > 80){
-          const esquerda = allX.filter(x=>x < gapX).length;
-          const direita  = allX.filter(x=>x >= gapX).length;
-          if(esquerda > allX.length*0.15 && direita > allX.length*0.15){
-            colSplitX = gapX;
+      const byY = {};
+      content.items.forEach(item=>{
+        if(!item.str) return;
+        const y = Math.round(item.transform[5] / 2) * 2;
+        if(!byY[y]) byY[y] = [];
+        byY[y].push({x:item.transform[4], str:item.str, w:item.width||0});
+      });
+      Object.keys(byY).sort((a,b)=>b-a).forEach(y=>{
+        const itens = byY[y].sort((a,b)=>a.x-b.x);
+        if(!itens.length) return;
+        const clusters = [[]];
+        let prevEndX = null;
+        itens.forEach(item=>{
+          const s = item.str; if(!s) return;
+          const startX = item.x, endX = startX + (item.w || s.length*6);
+          if(prevEndX !== null && (startX - prevEndX) > 60){
+            clusters.push([]);
           }
-        }
-      }
-
-      const processarColuna = (itemsCol) => {
-        const byY = {};
-        itemsCol.forEach(item=>{
-          const y = Math.round(item.transform[5] / 2) * 2;
-          if(!byY[y]) byY[y] = [];
-          byY[y].push({ x:item.transform[4], str:item.str, w:item.width||0 });
+          clusters[clusters.length-1].push(item);
+          prevEndX = endX;
         });
-        const linhas = [];
-        Object.keys(byY).sort((a,b)=>b-a).forEach(y=>{
-          const itens = byY[y].sort((a,b)=>a.x-b.x);
-          if(!itens.length) return;
-          let linha = '', prevEndX = null;
-          itens.forEach(item=>{
-            const s = item.str; if(!s) return;
+        clusters.forEach(cluster=>{
+          if(!cluster.length) return;
+          let linha = '', pEndX = null;
+          cluster.forEach(item=>{
+            const s = item.str;
             const startX = item.x, endX = startX + (item.w || s.length*6);
-            if(prevEndX === null) linha += s;
-            else {
-              const gap = startX - prevEndX;
-              linha += gap>20 ? '  '+s : gap>3 ? ' '+s : s;
-            }
-            prevEndX = endX;
+            if(pEndX === null) linha += s;
+            else { const gap = startX - pEndX; linha += gap>20?'  '+s:gap>3?' '+s:s; }
+            pEndX = endX;
           });
           const l = linha.trim();
-          if(l) linhas.push(l);
+          if(l) txt += l + '\n';
         });
-        return linhas;
-      };
-
-      const itensValidos = content.items.filter(i=>i.str && i.str.trim());
-
-      if(colSplitX !== null){
-        const colEsq = itensValidos.filter(i=>i.transform[4] < colSplitX);
-        const colDir = itensValidos.filter(i=>i.transform[4] >= colSplitX);
-        processarColuna(colEsq).forEach(l => txt += l + '\n');
-        processarColuna(colDir).forEach(l => txt += l + '\n');
-      } else {
-        processarColuna(itensValidos).forEach(l => txt += l + '\n');
-      }
+      });
     }
     document.getElementById('iTextoRawFatura').value = txt;
     zone.innerHTML = `<div class="drop-zone-icon">✅</div><div class="drop-zone-title">${file.name}</div><div class="drop-zone-sub" style="color:var(--gr)">${pdf.numPages} página(s) lida(s)</div>`;
