@@ -1,5 +1,5 @@
 // Netlify Function — Proxy para API Anthropic
-// Suporta texto puro e imagens (para leitura de comprovantes)
+// Suporta texto puro, imagens e PDFs (para leitura de comprovantes)
 
 exports.handler = async (event) => {
   const headers = {
@@ -18,18 +18,25 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { prompt, sistemPrompt, maxTokens, image } = JSON.parse(event.body || '{}');
+    const { prompt, sistemPrompt, maxTokens, image, pdf } = JSON.parse(event.body || '{}');
 
     if(!prompt){
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'prompt é obrigatório' }) };
     }
 
-    // Montar conteúdo da mensagem — texto ou imagem + texto
+    // Montar conteúdo da mensagem
     let messageContent;
+
     if(image && image.data && image.mediaType){
-      // Modo visão — comprovante como imagem
+      // Modo visão — imagem de comprovante
       messageContent = [
         { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } },
+        { type: 'text', text: prompt }
+      ];
+    } else if(pdf && pdf.data){
+      // Modo documento — PDF de comprovante
+      messageContent = [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.data } },
         { type: 'text', text: prompt }
       ];
     } else {
