@@ -3755,7 +3755,7 @@ function gerarContextoIA(){
   const maioresLancs = [...todosLancs]
     .filter(l=>l.tipo==='desp')
     .sort((a,b)=>b.valor-a.valor)
-    .slice(0,25)
+    .slice(0,15)
     .map(l=>{
       const cat = DB.categorias.find(c=>c.id===l.catId);
       return `R$${l.valor.toFixed(2)} | ${l.desc} | cat: ${cat?.nome||'?'} | ${l.data}`;
@@ -3768,7 +3768,7 @@ Mês atual: ${currentMes}
 HISTÓRICO (últimos 6 meses):
 ${resumoMeses}
 
-TOP 25 MAIORES LANÇAMENTOS INDIVIDUAIS (últimos 6 meses) — use isto para identificar possíveis erros de categorização (ex: uma transferência pessoal categorizada como "Transporte" por engano) ou gastos atípicos que merecem atenção:
+TOP 15 MAIORES LANÇAMENTOS INDIVIDUAIS (últimos 6 meses) — use isto para identificar possíveis erros de categorização (ex: uma transferência pessoal categorizada como "Transporte" por engano) ou gastos atípicos que merecem atenção:
 ${maioresLancs}
 
 PARCELAMENTOS ATIVOS: ${parcelados.length > 0 ? parcelados.slice(0,8).join('; ') : 'nenhum'}
@@ -5910,7 +5910,7 @@ function gerarContextoIACartao(){
   const todosGastos = meses.flatMap(ym => DB.gastosCartao[ym] || []);
   const maioresGastos = [...todosGastos]
     .sort((a,b)=>b.valor-a.valor)
-    .slice(0,25)
+    .slice(0,15)
     .map(g=>{
       const cat = DB.categorias.find(c=>c.id===g.catId);
       const cartao = DB.cartoes.find(c=>c.id===g.cartaoId);
@@ -5923,7 +5923,7 @@ Cartões cadastrados: ${(DB.cartoes||[]).map(c=>c.nome).join(', ')}
 HISTÓRICO (últimos 6 meses):
 ${resumoMeses || 'nenhum gasto registrado ainda'}
 
-TOP 25 MAIORES GASTOS INDIVIDUAIS NO CARTÃO:
+TOP 15 MAIORES GASTOS INDIVIDUAIS NO CARTÃO:
 ${maioresGastos || 'nenhum'}
 
 CATEGORIAS DISPONÍVEIS: ${DB.categorias.filter(c=>c.tipo==='desp').map(c=>c.nome).join(', ')}
@@ -5950,12 +5950,27 @@ async function gerarAnaliseCompletaRel(tipo){
     const contexto = tipo === 'conta' ? gerarContextoIA() : gerarContextoIACartao();
     const assunto  = tipo === 'conta' ? 'da conta corrente' : 'do cartão de crédito';
 
-    const sistemMsg = `Você é um consultor financeiro pessoal integrado ao app Finia, agindo com a profundidade de uma análise humana completa — não uma resposta superficial. Estruture sua resposta como um relatório direto e prático cobrindo: (1) o quadro geral (totais e padrões do período), (2) onde o dinheiro está indo (maiores categorias e padrões mês a mês), (3) qualquer anomalia ou possível erro de categorização que você notar nos lançamentos individuais fornecidos, (4) de 3 a 4 recomendações práticas e específicas baseadas nos dados reais — não genéricas. Use **negrito** para valores importantes. Tom direto, acolhedor e sem jargão técnico. Responda em português brasileiro, em formato de texto corrido com parágrafos (não use markdown de cabeçalhos #, apenas **negrito**).\n\n${contexto}`;
+    const sistemMsg = `Você é um consultor financeiro pessoal integrado ao app Finia. Estruture sua resposta como um relatório direto e prático cobrindo: (1) o quadro geral (totais e padrões do período), (2) onde o dinheiro está indo (maiores categorias), (3) qualquer anomalia ou possível erro de categorização que você notar nos lançamentos individuais, (4) 3 recomendações práticas e específicas baseadas nos dados reais. Use **negrito** para valores importantes. Tom direto e acolhedor. Responda em português brasileiro, em texto corrido com parágrafos curtos (sem markdown de cabeçalhos #, apenas **negrito**). Seja conciso — no máximo 5 parágrafos curtos.\n\n${contexto}`;
 
-    const resposta = await chamarIA(
-      `Faça uma análise completa ${assunto} e me dê dicas práticas para melhorar.`,
-      sistemMsg, 1400
-    );
+    // Retry automático — chamadas de IA com resposta longa podem exceder o
+    // timeout da função serverless (Netlify free = ~10s). Tentamos algumas
+    // vezes antes de desistir, já que falhas de timeout costumam ser
+    // intermitentes (depende de carga do servidor no momento).
+    let resposta = null;
+    let ultimoErro = null;
+    for(let tentativa=1; tentativa<=3 && !resposta; tentativa++){
+      if(tentativa > 1) btn.innerHTML = `⏳ Tentativa ${tentativa}/3...`;
+      try {
+        resposta = await chamarIA(
+          `Faça uma análise completa ${assunto} e me dê dicas práticas para melhorar.`,
+          sistemMsg, 900
+        );
+      } catch(errTentativa){
+        ultimoErro = errTentativa;
+        if(tentativa < 3) await new Promise(r=>setTimeout(r, 1500));
+      }
+    }
+    if(!resposta) throw ultimoErro || new Error('Falha desconhecida');
 
     const respostaHtml = resposta
       .replace(/\*\*(.+?)\*\*/g,'<strong style="color:var(--tx)">$1</strong>')
@@ -5972,7 +5987,14 @@ async function gerarAnaliseCompletaRel(tipo){
         <div style="font-size:13px;line-height:1.7;color:var(--tx)"><p>${respostaHtml}</p></div>
       </div>`;
   } catch(err){
-    wrap.innerHTML = `<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:16px;padding:16px;font-size:13px;color:#f87171">⚠️ Erro ao gerar análise: ${err.message.slice(0,100)}</div>`;
+    const isTimeout = /504|timeout|indisponível/i.test(err.message);
+    const msgErro = isTimeout
+      ? 'A análise demorou demais para ser gerada (timeout do servidor). Toque em "Tentar de novo" — geralmente funciona na 2ª tentativa.'
+      : err.message.slice(0,100);
+    wrap.innerHTML = `<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:16px;padding:16px;font-size:13px;color:#f87171">
+      ⚠️ ${msgErro}
+      <button onclick="gerarAnaliseCompletaRel('${tipo}')" style="display:block;margin-top:10px;padding:8px 14px;border-radius:10px;border:1px solid #f87171;background:transparent;color:#f87171;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">🔄 Tentar de novo</button>
+    </div>`;
   } finally {
     btn.disabled = false;
     btn.style.opacity = '1';
