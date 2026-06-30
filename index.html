@@ -4452,16 +4452,40 @@ async function lerComprovante(file){
   status.textContent = '✨ Lendo comprovante...';
 
   try {
-    // Converter arquivo para base64
-    const base64 = await new Promise((res, rej)=>{
-      const r = new FileReader();
-      r.onload = ()=> res(r.result.split(',')[1]);
-      r.onerror = ()=> rej(new Error('Erro ao ler arquivo'));
-      r.readAsDataURL(file);
-    });
-
     const isImage = file.type.startsWith('image/');
     const isPDF   = file.type === 'application/pdf';
+
+    // Converter arquivo para base64 — redimensionar imagens para max 1200px (limite Netlify 6MB)
+    const base64 = await new Promise((res, rej)=>{
+      if(isImage){
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          const MAX = 1200;
+          let w = img.width, h = img.height;
+          if(w > MAX || h > MAX){
+            if(w > h){ h = Math.round(h * MAX / w); w = MAX; }
+            else      { w = Math.round(w * MAX / h); h = MAX; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          res(dataUrl.split(',')[1]);
+        };
+        img.onerror = () => rej(new Error('Erro ao ler imagem'));
+        img.src = url;
+      } else {
+        const r = new FileReader();
+        r.onload = ()=> res(r.result.split(',')[1]);
+        r.onerror = ()=> rej(new Error('Erro ao ler arquivo'));
+        r.readAsDataURL(file);
+      }
+    });
+
+    // Após redimensionar, mediaType é sempre jpeg para imagens
+    const mediaType = isImage ? 'image/jpeg' : file.type;
 
     const cats = DB.categorias.map(c=>c.nome).join(', ');
     const promptTexto = `Analise este comprovante de pagamento e extraia as informações.
@@ -4491,14 +4515,27 @@ Se não conseguir identificar algum campo, use null.`;
           prompt: promptTexto,
           sistemPrompt: 'Você lê comprovantes financeiros brasileiros. Retorne apenas JSON válido, sem markdown.',
           maxTokens: 500,
-          image: { data: base64, mediaType: file.type }
+          image: { data: base64, mediaType: mediaType }
         })
       });
       if(!r.ok) throw new Error('Erro ao processar comprovante ('+r.status+')');
       const d = await r.json();
       resposta = d.content?.map(b=>b.text||'').join('') || d.text || '';
     } else if(isPDF){
-      resposta = await chamarIA(promptTexto, 'Você lê comprovantes financeiros brasileiros. Retorne apenas JSON válido, sem markdown.', 500);
+      // Enviar PDF em base64 via proxy com suporte a documento
+      const r = await fetch(IA_PROXY, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          prompt: promptTexto,
+          sistemPrompt: 'Você lê comprovantes financeiros brasileiros. Retorne apenas JSON válido, sem markdown.',
+          maxTokens: 500,
+          pdf: { data: base64 }
+        })
+      });
+      if(!r.ok) throw new Error('Erro ao processar comprovante ('+r.status+')');
+      const d = await r.json();
+      resposta = d.content?.map(b=>b.text||'').join('') || d.text || '';
     } else {
       throw new Error('Formato não suportado. Use imagem (JPG, PNG) ou PDF.');
     }
