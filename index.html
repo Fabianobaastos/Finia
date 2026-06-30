@@ -2035,6 +2035,11 @@ function confirmarImportBackup(){
   DB.settings    = dados.settings    || {privacidade:false};
   DB.pro         = dados.pro         || {ativo:false};
   DB.uso         = dados.uso         || {importacoesMes:{},lancamentosMes:{}};
+  // Campos de cartão e saldo — críticos para não perder dados ao restaurar
+  DB.gastosCartao   = dados.gastosCartao   || {};
+  DB.cartoes        = dados.cartoes        || DB.cartoes;
+  DB.saldoConta     = dados.saldoConta     ?? null;
+  DB.saldoContaData = dados.saldoContaData ?? null;
   dbSave();
   window._backupPendente = null;
   showToast('Backup restaurado com sucesso ✓');
@@ -2410,8 +2415,9 @@ function rodarParser(){
   const txt = document.getElementById('iTextoRaw').value.trim();
   if(!txt){ showToast('Cole o texto do extrato ou fatura primeiro 📋'); return; }
 
-  // Resetar saldo detectado
+  // Resetar saldo detectado e parsedItems antes de nova análise
   window._saldoDetectado = null;
+  parsedItems = [];
 
   // Detectar banco antes de parsear (para debug)
   let bancoDetectado = 'Genérico';
@@ -3860,6 +3866,7 @@ function adicionarMensagemChat(tipo, texto, isLoading = false){
 }
 
 async function solicitarAnaliseCompleta(){
+  if(!isPro()){ showUpgradeModal('O assistente financeiro IA é exclusivo do plano Pro.'); return; }
   if(iaSendindo) return;
   const msgUsuario = '📊 Faça uma análise completa dos meus gastos dos últimos meses (conta corrente) e me dê dicas para melhorar.';
 
@@ -3968,7 +3975,7 @@ async function gerarInsightIA(){
     const texto = await chamarIA(prompt, 'Você é um analista financeiro. Responda em português brasileiro, de forma direta e prática. Máximo 2 frases.', 200);
 
     // Salvar no cache
-    localStorage.setItem(cacheKey, JSON.stringify({data: hoje_str, texto}));
+    try { localStorage.setItem(cacheKey, JSON.stringify({data: hoje_str, texto})); } catch{}
     renderInsightCard(texto);
 
   } catch(err) {
@@ -5298,14 +5305,16 @@ function abrirImportFatura(){
 
   const sel = document.getElementById('cartao-select-import');
   cartaoImpSelId = DB.cartoes[0]?.id || null;
+  // Recriar o innerHTML elimina listeners acumulados de aberturas anteriores
   sel.innerHTML = DB.cartoes.map(c=>
     `<button data-cid="${c.id}" class="imp-type-btn${c.id===cartaoImpSelId?' active':''}" style="border-color:${c.cor}">${c.nome}</button>`
   ).join('');
+  // Usar onclick (sobrescritível) em vez de addEventListener (acumulável)
   sel.querySelectorAll('[data-cid]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.onclick = ()=>{
       cartaoImpSelId = btn.dataset.cid;
       sel.querySelectorAll('[data-cid]').forEach(b=>b.classList.toggle('active', b===btn));
-    });
+    };
   });
 }
 
@@ -5479,7 +5488,8 @@ function registrarDivergenciaParser(items, txtOriginal){
 // Função utilitária para o usuário/dev exportar os registros acumulados
 // (pode ser chamada manualmente no console, ou exposta numa tela de config)
 function exportarDivergenciasParser(){
-  const registros = JSON.parse(localStorage.getItem('finia_divergencias_parser') || '[]');
+  let registros = [];
+  try { registros = JSON.parse(localStorage.getItem('finia_divergencias_parser') || '[]'); } catch{}
   if(!registros.length){
     showToast('Nenhuma divergência registrada ainda.');
     return;
@@ -5725,11 +5735,18 @@ function confirmarImportacaoFatura(){
   if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
 
   parsedItemsFatura.forEach(it=>{
-    // Converter data DD/MM para AAAA-MM-DD usando o mês de referência atual
+    // Converter data DD/MM para AAAA-MM-DD
+    // O ano é inferido: se o mês do lançamento for maior que o mês atual da fatura,
+    // assume ano anterior (parcelamento antigo), senão usa o ano da fatura.
     let dataISO = new Date().toISOString().slice(0,10);
     if(it.data && it.data.includes('/')){
-      const [dd,mm] = it.data.split('/');
-      dataISO = `${mes.slice(0,4)}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+      const [dd, mm] = it.data.split('/');
+      const anoFatura = parseInt(mes.slice(0,4));
+      const mesFatura = parseInt(mes.slice(5,7));
+      const mesLanc   = parseInt(mm);
+      // Lançamento em mês posterior ao mês da fatura → deve ser do ano anterior
+      const ano = mesLanc > mesFatura + 1 ? anoFatura - 1 : anoFatura;
+      dataISO = `${ano}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
     }
     DB.gastosCartao[mes].push({
       id: 'gc'+Date.now()+Math.random().toString(36).slice(2,7),
