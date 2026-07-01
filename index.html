@@ -5467,26 +5467,35 @@ function mesAtualCartao(){ return currentMes || mesAtual(); }
 function getGastosCartao(mes){
   mes = mes || mesAtualCartao();
   const diaFech = parseInt(DB.settings?.diaFechamento) || 0;
+  const [ano, m] = mes.split('-').map(Number);
 
-  // Sem dia de fechamento configurado — comportamento legado (chave exata)
-  if(!diaFech){
-    if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
-    return DB.gastosCartao[mes];
+  let dataIni, dataFim;
+
+  if(diaFech){
+    // Com fechamento configurado: período de fatura
+    // Ex: fechamento=25, mês=Jun → 26/Mai a 25/Jun
+    dataIni = new Date(ano, m-2, diaFech+1);
+    dataFim = new Date(ano, m-1, diaFech);
+  } else {
+    // Sem fechamento: mês calendário completo (01 ao último dia do mês)
+    dataIni = new Date(ano, m-1, 1);
+    dataFim = new Date(ano, m, 0); // dia 0 do mês seguinte = último dia do mês atual
   }
 
-  // Calcular intervalo do período de fatura
-  const [ano, m] = mes.split('-').map(Number);
-  // Início: dia seguinte ao fechamento no mês anterior
-  const dataIni = new Date(ano, m-2, diaFech+1); // mês anterior, dia fechamento+1
-  // Fim: dia de fechamento do mês atual
-  const dataFim = new Date(ano, m-1, diaFech);
+  // Filtrar todos os gastos de todos os meses pela data real da compra
+  const todos = Object.values(DB.gastosCartao || {}).flat();
 
-  // Varrer todos os meses do gastosCartao e filtrar pelo período
-  return Object.values(DB.gastosCartao || {}).flat().filter(g=>{
-    if(!g.data) return false; // sem data — ignorar (evita duplicar lançamentos legados)
+  // Gastos com data: filtrar pelo intervalo
+  const comData = todos.filter(g => {
+    if(!g.data) return false;
     const d = new Date(g.data + 'T12:00:00');
     return d >= dataIni && d <= dataFim;
   });
+
+  // Gastos sem data (legado): usar chave do mês como fallback
+  const semData = (DB.gastosCartao[mes] || []).filter(g => !g.data);
+
+  return [...comData, ...semData];
 }
 
 // ── RENDER PRINCIPAL DA ABA ──────────────────────────────────────────────────
