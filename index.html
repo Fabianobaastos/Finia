@@ -480,7 +480,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <button id="btn-sel-lanc" onclick="toggleModoSelecaoLanc()" style="margin-left:auto;flex-shrink:0;padding:6px 12px;border-radius:20px;border:1.5px solid var(--bd);background:transparent;color:var(--mu);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">☑ Selecionar</button>
     </div>
     <!-- Barra de ação — aparece só no modo seleção -->
-    <div id="lanc-sel-bar" style="display:none;background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:10px 14px;margin-bottom:10px;display:none;align-items:center;gap:10px">
+    <div id="lanc-sel-bar" style="display:none;background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:10px 14px;margin-bottom:10px;align-items:center;gap:10px">
       <span id="lanc-sel-count" style="font-size:12px;font-weight:700;color:var(--tx);flex:1">0 selecionados</span>
       <button onclick="selecionarTodosLanc()" style="padding:6px 12px;border-radius:10px;border:1.5px solid var(--bd);background:transparent;color:var(--mu);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Todos</button>
       <button onclick="excluirSelecionadosLanc()" style="padding:6px 14px;border-radius:10px;border:none;background:var(--rd);color:#fff;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">🗑 Excluir</button>
@@ -2162,8 +2162,12 @@ function closeAllDrawers(){
 }
 
 function prepDrawerLanc(){
+  // Usar data de hoje se estamos no mês atual, ou o primeiro dia do mês exibido
+  // (evita salvar em mês diferente do que o usuário está vendo)
   const hoje_ = hoje();
-  document.getElementById('lanc-data').value = hoje_;
+  const mesHoje = hoje_.slice(0,7);
+  const dataDefault = mesHoje === currentMes ? hoje_ : currentMes + '-01';
+  document.getElementById('lanc-data').value = dataDefault;
   document.getElementById('lanc-valor').value='';
   document.getElementById('lanc-desc').value='';
   document.getElementById('lanc-nota').value='';
@@ -2236,9 +2240,10 @@ function salvarLanc(){
   const catId=document.getElementById('lanc-cat').value;
   if(!valor||isNaN(valor)){ showToast('Informe o valor 💰'); return; }
   if(!desc){ showToast('Informe a descrição'); return; }
-  // Verificar limite Free (só para novos lançamentos, não edição)
+  // Mês do lançamento é determinado pela data escolhida, não pelo mês exibido
+  const mesDaData = data.slice(0,7);
   if(!editLancId){
-    const lim = checarLimite('lancamento', currentMes);
+    const lim = checarLimite('lancamento', mesDaData);
     if(!lim.ok){ closeAllDrawers(); showUpgradeModal(lim.msg); return; }
   }
   const parcOn=document.getElementById('tgl-parc').classList.contains('on');
@@ -2249,12 +2254,15 @@ function salvarLanc(){
     parcTotal: parcOn?parseInt(document.getElementById('lanc-parc-total').value)||1:1,
     nota: document.getElementById('lanc-nota').value.trim()
   };
-  if(!DB.lancamentos[currentMes]) DB.lancamentos[currentMes]=[];
+  if(!DB.lancamentos[mesDaData]) DB.lancamentos[mesDaData]=[];
   if(editLancId){
-    const idx=DB.lancamentos[currentMes].findIndex(l=>l.id===editLancId);
-    if(idx>=0) DB.lancamentos[currentMes][idx]=lanc;
+    // Ao editar, remover do mês antigo e inserir no mês da nova data
+    Object.keys(DB.lancamentos).forEach(m=>{
+      DB.lancamentos[m] = DB.lancamentos[m].filter(l=>l.id!==editLancId);
+    });
+    DB.lancamentos[mesDaData].push(lanc);
   } else {
-    DB.lancamentos[currentMes].push(lanc);
+    DB.lancamentos[mesDaData].push(lanc);
   }
   dbSave(); closeAllDrawers();
   showToast(editLancId?'Lançamento atualizado ✓':'Lançamento salvo ✓');
