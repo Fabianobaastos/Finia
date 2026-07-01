@@ -659,45 +659,57 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <button onclick="document.getElementById('cartao-step-import').style.display='none';document.getElementById('cartao-step-lista').style.display=''" style="background:none;border:none;color:var(--mu);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px">← Voltar</button>
 
       <div class="form-label">Qual cartão é essa fatura?</div>
-      <div id="cartao-select-import" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
+      <div id="cartao-select-import" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
 
-      <div id="iCartaoWrap2" style="margin-bottom:16px">
-        <div class="form-label">Qual portador importar?</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
-            <input type="radio" name="cartaoFiltroPortador" value="todos" checked style="accent-color:var(--gr)">
-            <div><div style="font-size:13px;font-weight:600">Todos os portadores</div></div>
+      <!-- BOTÕES DE ANÁLISE — visíveis sem rolar -->
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <button id="btn-rodarParserFaturaIA" onclick="rodarParserFaturaIA()"
+          style="width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,rgba(99,102,241,.9),rgba(167,139,250,.8));color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+          ✨ Analisar com IA <span style="font-size:11px;font-weight:500;opacity:.85">(qualquer banco)</span>
+        </button>
+        <button onclick="rodarParserFatura()"
+          style="width:100%;padding:12px;border-radius:14px;border:1.5px solid var(--bd);background:transparent;color:var(--ts);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">
+          🔍 Parser rápido (Itaú)
+        </button>
+      </div>
+
+      <!-- ÁREA DE CONTEÚDO — upload ou texto -->
+      <details style="margin-bottom:14px">
+        <summary style="font-size:12px;font-weight:700;color:var(--mu);cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <span id="fatura-content-label">📎 Arquivo ou texto da fatura</span>
+          <span style="margin-left:auto;font-size:10px;color:var(--bd)">▼</span>
+        </summary>
+        <div class="drop-zone" id="iDropZoneFatura"
+          onclick="document.getElementById('iFileInputFatura').click()"
+          ondrop="handleDropFatura(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+          <div class="drop-zone-icon">💳</div>
+          <div class="drop-zone-title">Toque para escolher o PDF</div>
+          <div class="drop-zone-sub">ou arraste o arquivo aqui</div>
+          <input type="file" id="iFileInputFatura" accept=".pdf,.txt" style="display:none" onchange="handleFileInputFatura(event)">
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin:10px 0">
+          <div style="flex:1;height:1px;background:var(--bd)"></div>
+          <div style="font-size:11px;color:var(--mu);font-weight:600">ou cole o texto</div>
+          <div style="flex:1;height:1px;background:var(--bd)"></div>
+        </div>
+        <textarea id="iTextoRawFatura" placeholder="Cole o texto da fatura do cartão (PDF copiado)..." style="width:100%;min-height:100px;background:var(--s1);border:1.5px solid var(--bd);border-radius:14px;padding:14px;color:var(--tx);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+      </details>
+
+      <!-- Filtro de portador — compacto, em linha -->
+      <div id="iCartaoWrap2" style="margin-bottom:4px">
+        <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Portador a importar</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;color:var(--ts)">
+            <input type="radio" name="cartaoFiltroPortador" value="todos" checked style="accent-color:var(--gr)"> Todos
           </label>
-          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
-            <input type="radio" name="cartaoFiltroPortador" value="titular" style="accent-color:var(--gr)">
-            <div><div style="font-size:13px;font-weight:600">Somente titular</div></div>
+          <label style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;color:var(--ts)">
+            <input type="radio" name="cartaoFiltroPortador" value="titular" style="accent-color:var(--gr)"> Titular
           </label>
-          <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer">
-            <input type="radio" name="cartaoFiltroPortador" value="adicional" style="accent-color:var(--gr)">
-            <div><div style="font-size:13px;font-weight:600">Somente adicionais</div></div>
+          <label style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:var(--s2);border:1.5px solid var(--bd);border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;color:var(--ts)">
+            <input type="radio" name="cartaoFiltroPortador" value="adicional" style="accent-color:var(--gr)"> Adicionais
           </label>
         </div>
       </div>
-
-      <div class="form-label">Arquivo ou texto da fatura</div>
-      <div class="drop-zone" id="iDropZoneFatura"
-        onclick="document.getElementById('iFileInputFatura').click()"
-        ondrop="handleDropFatura(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-        <div class="drop-zone-icon">💳</div>
-        <div class="drop-zone-title">Toque para escolher o PDF</div>
-        <div class="drop-zone-sub">ou arraste o arquivo aqui</div>
-        <input type="file" id="iFileInputFatura" accept=".pdf,.txt" style="display:none" onchange="handleFileInputFatura(event)">
-      </div>
-
-      <div style="display:flex;align-items:center;gap:10px;margin:12px 0">
-        <div style="flex:1;height:1px;background:var(--bd)"></div>
-        <div style="font-size:11px;color:var(--mu);font-weight:600">ou cole o texto</div>
-        <div style="flex:1;height:1px;background:var(--bd)"></div>
-      </div>
-      <textarea id="iTextoRawFatura" placeholder="Cole o texto da fatura do cartão (PDF copiado)..." style="width:100%;min-height:120px;background:var(--s1);border:1.5px solid var(--bd);border-radius:14px;padding:14px;color:var(--tx);font-family:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
-
-      <button class="btn-main" onclick="rodarParserFatura()">🔍 Analisar fatura</button>
-      <button class="btn-ghost" id="btn-rodarParserFaturaIA" style="margin-top:10px" onclick="rodarParserFaturaIA()">✨ Analisar com IA (recomendado)</button>
     </div>
 
     <!-- Revisão dos itens da fatura antes de confirmar -->
@@ -5828,6 +5840,9 @@ async function doExtractFatura(file){
     }
     document.getElementById('iTextoRawFatura').value = txt;
     zone.innerHTML = `<div class="drop-zone-icon">✅</div><div class="drop-zone-title">${file.name}</div><div class="drop-zone-sub" style="color:var(--gr)">${pdf.numPages} página(s) lida(s)</div>`;
+    // Atualizar o label do summary com o nome do arquivo
+    const lbl = document.getElementById('fatura-content-label');
+    if(lbl) lbl.textContent = `✅ ${file.name} (${pdf.numPages}p)`;
   } catch(err){
     zone.innerHTML = `<div class="drop-zone-icon">❌</div><div class="drop-zone-title">Não foi possível ler o PDF</div><div class="drop-zone-sub">${err.message}</div>`;
   }
@@ -6042,13 +6057,44 @@ async function rodarParserFaturaIA(){
       }
     }
 
-    // Blocos pequenos (2500 chars) — Netlify Functions no plano gratuito têm
-    // timeout de ~10s, e blocos grandes com muito texto + resposta longa da IA
-    // facilmente excedem isso, fazendo o bloco falhar silenciosamente.
-    const TAMANHO_BLOCO = 2500;
+    // ── PASSO 1: Detectar portadores por regex (rápido, zero chamadas de IA) ──────
+    // Percorre o texto procurando linhas de cabeçalho de seção que identificam
+    // portadores (funciona com Itaú, Bradesco, Nubank e qualquer banco que separe
+    // portadores por seções nomeadas). O portador de cada item é determinado
+    // pelo offset do bloco no texto original — sem custo extra de IA.
+    statusEl.textContent = '✨ Identificando portadores...';
+    const mapaPortadores = []; // [{offset, portador}]
+    let primeiroFinalVisto = null;
+    // Padrão com final explícito: "NOME SOBRENOME (final 1234)"
+    const reSecaoPort = /^[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇa-záéíóúâêîôûãõç\s]{2,}\(final\s*(\d{4})\)/gm;
+    // Padrão simples: "Titular" / "Adicional" / "Cartão adicional"
+    const reSecaoSimples = /^(titular|adicional|cartão adicional|cartao adicional)\b/gim;
+    let _m;
+    while((_m = reSecaoPort.exec(txt)) !== null){
+      const final = _m[1];
+      if(!primeiroFinalVisto) primeiroFinalVisto = final;
+      mapaPortadores.push({ offset: _m.index, portador: final === primeiroFinalVisto ? 'titular' : 'adicional' });
+    }
+    while((_m = reSecaoSimples.exec(txt)) !== null){
+      const tipo = _m[1].toLowerCase().includes('adicional') ? 'adicional' : 'titular';
+      mapaPortadores.push({ offset: _m.index, portador: tipo });
+    }
+    mapaPortadores.sort((a,b)=>a.offset-b.offset);
+
+    function portadorDoOffset(offset){
+      if(!mapaPortadores.length) return 'desconhecido';
+      let atual = mapaPortadores[0].portador;
+      for(const p of mapaPortadores){ if(p.offset > offset) break; atual = p.portador; }
+      return atual;
+    }
+
+    // ── PASSO 2: Extrair lançamentos em blocos pequenos (prompt enxuto) ───────────
+    // Sem portador no prompt → resposta JSON menor → menos tokens → menos timeout.
+    // Portador é atribuído pelo offset após retorno da IA.
+    const TAMANHO_BLOCO = 2000;
     const blocos = [];
     for(let i=0; i<txt.length; i+=TAMANHO_BLOCO){
-      blocos.push(txt.slice(i, i+TAMANHO_BLOCO));
+      blocos.push({ texto: txt.slice(i, i+TAMANHO_BLOCO), offsetInicio: i });
     }
 
     let todosItens = [];
@@ -6056,29 +6102,23 @@ async function rodarParserFaturaIA(){
     for(let i=0; i<blocos.length; i++){
       statusEl.textContent = `✨ Analisando parte ${i+1} de ${blocos.length}...`;
 
-      const prompt = `Extraia TODOS os lançamentos de compra/saque desta PARTE de uma fatura de cartão de crédito brasileira.
+      const prompt = `Extraia lançamentos de compra desta parte de fatura de cartão de crédito brasileira.
 
-CATEGORIAS DISPONÍVEIS: ${cats}
+CATEGORIAS: ${cats}
 
-TEXTO DA FATURA (parte ${i+1} de ${blocos.length}):
-${blocos[i]}
+TEXTO (parte ${i+1}/${blocos.length}):
+${blocos[i].texto}
 
-Retorne APENAS JSON: {"itens":[{"data":"DD/MM","desc":"nome do estabelecimento","valor":99.90,"categoria":"NomeCategoria","parcAtual":1,"parcTotal":1,"portador":"titular"}]}
+Retorne APENAS JSON: {"itens":[{"data":"DD/MM","desc":"estabelecimento","valor":99.90,"categoria":"NomeCategoria","parcAtual":1,"parcTotal":1}]}
 
-CAMPO PORTADOR — identifique a qual portador pertence cada lançamento:
-- Faturas com múltiplos cartões/portadores geralmente têm seções separadas por nome, ex: "JOAO SILVA (final 1234)" ou "Titular" / "Adicional"
-- Use "titular" para lançamentos do portador principal (quem emitiu o cartão)
-- Use "adicional" para lançamentos de cartões adicionais (cônjuge, filhos, etc.)
-- Use "desconhecido" se não conseguir determinar o portador
-
-REGRAS IMPORTANTES:
-- Ignore totais, subtotais, juros, encargos, IOF, limites de crédito e linhas de cabeçalho/rodapé
-- Ignore anuidades que tenham um estorno correspondente na mesma fatura (se cobrança e estorno aparecem, ambos se anulam)
-- Ignore qualquer linha com valor negativo ou marcada como estorno/crédito/devolução
-- Detecte parcelamentos no formato "01/03" no final da descrição (parcAtual/parcTotal)
-- Lançamentos internacionais já convertidos para R$ devem ser incluídos normalmente
-- Se não conseguir identificar a categoria, use "Outros gastos"
-- Esta é apenas uma PARTE do documento — ignore linhas incompletas sem data+valor claros`;
+REGRAS:
+- Ignore totais, juros, encargos, IOF, limites e cabeçalhos
+- Ignore anuidades com estorno correspondente
+- Ignore valores negativos
+- Parcelamentos: detecte "01/03" no final
+- Internacionais em R$: inclua normalmente
+- Desconhecido: use "Outros gastos"
+- Ignore linhas sem data+valor claros`;
 
       // Retry automático — se a chamada falhar (ex: timeout da função serverless),
       // tenta de novo até 2 vezes antes de desistir desse bloco.
@@ -6091,9 +6131,13 @@ REGRAS IMPORTANTES:
           let dados;
           try { dados = JSON.parse(json); }
           catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
-          const itensBloco = dados.itens || [];
+          const itensBloco = (dados.itens || []).map(it=>({
+            ...it,
+            // Portador determinado pela posição do bloco no texto original
+            portador: portadorDoOffset(blocos[i].offsetInicio)
+          }));
           todosItens = todosItens.concat(itensBloco);
-          console.log(`Bloco ${i+1}/${blocos.length} (tentativa ${tentativa}): ${itensBloco.length} itens, soma R$ ${itensBloco.reduce((s,it)=>s+(it.valor||0),0).toFixed(2)}`);
+          console.log(`Bloco ${i+1}/${blocos.length} (tentativa ${tentativa}): ${itensBloco.length} itens, portador=${portadorDoOffset(blocos[i].offsetInicio)}, soma R$ ${itensBloco.reduce((s,it)=>s+(it.valor||0),0).toFixed(2)}`);
           sucesso = true;
         } catch(errBloco){
           console.warn(`Erro no bloco ${i+1} (tentativa ${tentativa}):`, errBloco.message);
