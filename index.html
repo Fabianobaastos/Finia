@@ -1588,19 +1588,34 @@ function renderInicio(){
     </div>`;
   })() : '';
 
-  // KPIs — parcelas: total restante a pagar em TODOS os meses (não só o atual)
+  // KPIs — parcelas: total restante a pagar, descontando os meses já passados
+  // desde a data/mês em que cada parcela foi registrada.
+  const mesAtualNum = (()=>{ const [y,m]=currentMes.split('-').map(Number); return y*12+m; })();
   const todasParcConta = Object.values(DB.lancamentos||{}).flat()
-    .filter(l=>l.parcTotal>1 && l.tipo==='desp');
+    .filter(l=>l.parcTotal>1 && l.tipo==='desp')
+    .map(l=>({...l, _chaveMes: l.data ? l.data.slice(0,7) : currentMes}));
   const todasParcCartao = Object.values(DB.gastosCartao||{}).flat()
-    .filter(g=>g.parcTotal>1);
+    .filter(g=>g.parcTotal>1)
+    .map(g=>({...g, _chaveMes: g.data ? g.data.slice(0,7) : currentMes}));
+
   const vistosParcKpi = new Set();
   const parcUnicas = [...todasParcConta, ...todasParcCartao].filter(p=>{
     const chave = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`;
     if(vistosParcKpi.has(chave)) return false;
     vistosParcKpi.add(chave); return true;
   });
+
   const totalRestanteKpi = parcUnicas.reduce((s,p)=>{
-    return s + Math.max(0, p.parcTotal - p.parcAtual + 1) * p.valor;
+    // Descobrir em que mês essa parcela (parcAtual) foi registrada
+    const [py, pm] = p._chaveMes.split('-').map(Number);
+    const mesRegistro = py*12 + pm;
+    // Quantos meses passaram desde o registro até o mês atual exibido
+    const mesesPassados = Math.max(0, mesAtualNum - mesRegistro);
+    // Parcela atual "corrigida pelo tempo"
+    const parcAtualCorrigida = p.parcAtual + mesesPassados;
+    // Parcelas restantes a partir de hoje
+    const restantes = Math.max(0, p.parcTotal - parcAtualCorrigida + 1);
+    return s + restantes * p.valor;
   }, 0);
   const cats = DB.categorias.filter(c=>c.tipo==='desp'||c.tipo==='both');
   const topCat = (() => {
