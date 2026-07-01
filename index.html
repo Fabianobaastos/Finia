@@ -1881,23 +1881,52 @@ function _getParcelas(){
   })).filter(g=> g.parcAtualHoje <= g.rep.parcTotal);
 }
 
-function excluirParcela(chave, modalEl){
+function excluirParcela(chave, modalPaiEl){
   const grupos = _getParcelas();
   const grupo = grupos.find(g=>`${g.rep.desc}|${Number(g.rep.valor).toFixed(2)}|${g.rep.parcTotal}` === chave);
   if(!grupo) return;
-  if(!confirm(`Excluir todas as ${grupo.ids.length} parcela(s) de "${grupo.rep.desc}" do seu histórico?`)) return;
-  grupo.ids.forEach(({id, mes, origem})=>{
-    if(origem==='conta' && DB.lancamentos[mes]){
-      DB.lancamentos[mes] = DB.lancamentos[mes].filter(l=>l.id!==id);
-    } else if(origem==='cartao' && DB.gastosCartao[mes]){
-      DB.gastosCartao[mes] = DB.gastosCartao[mes].filter(g=>g.id!==id);
-    }
-  });
-  dbSave();
-  showToast('Parcelas excluídas ✓');
-  modalEl.remove();
-  renderInicio();
-  abrirPainelDividas();
+
+  // Modal de confirmação customizado (confirm() é bloqueado em PWA/iOS)
+  const conf = document.createElement('div');
+  conf.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  conf.innerHTML = `
+    <div style="background:var(--s1);border:1px solid var(--bd);border-radius:20px;padding:24px;max-width:320px;width:100%;text-align:center">
+      <div style="font-size:28px;margin-bottom:10px">🗑</div>
+      <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:8px">Excluir parcelamento?</div>
+      <div style="font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.5"><strong style="color:var(--ts)">${grupo.rep.desc}</strong><br>${grupo.ids.length} entrada(s) serão removidas do histórico.</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button id="_conf-sim" style="padding:13px;border-radius:12px;border:none;background:var(--rd);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">Sim, excluir</button>
+        <button id="_conf-nao" style="padding:12px;border-radius:12px;border:1.5px solid var(--bd);background:transparent;color:var(--mu);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(conf);
+
+  const fecharConf = ()=> conf.remove();
+  conf.getElementById = id => conf.querySelector('#'+id);
+
+  const btnSim = conf.querySelector('#_conf-sim');
+  const btnNao = conf.querySelector('#_conf-nao');
+
+  // Usar onclick (funciona em PWA/iOS sem problemas)
+  btnNao.onclick = fecharConf;
+  conf.onclick = e=>{ if(e.target===conf) fecharConf(); };
+
+  btnSim.onclick = ()=>{
+    fecharConf();
+    grupo.ids.forEach(({id, mes, origem})=>{
+      if(origem==='conta' && DB.lancamentos[mes]){
+        DB.lancamentos[mes] = DB.lancamentos[mes].filter(l=>l.id!==id);
+      } else if(origem==='cartao' && DB.gastosCartao[mes]){
+        DB.gastosCartao[mes] = DB.gastosCartao[mes].filter(g=>g.id!==id);
+      }
+    });
+    dbSave();
+    showToast('Parcelamento excluído ✓');
+    // Fechar o painel de parcelas e reabrir atualizado
+    document.querySelectorAll('div[style*="z-index:9000"]').forEach(el=>el.remove());
+    renderInicio();
+    abrirPainelDividas();
+  };
 }
 
 function abrirPainelDividas(){
