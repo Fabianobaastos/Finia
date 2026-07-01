@@ -645,7 +645,9 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button onclick="toggleModoSelecaoCartao()" style="padding:6px 10px;border-radius:10px;border:1.5px solid var(--bd);background:transparent;color:var(--mu);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">✕</button>
       </div>
 
-      <div id="cartao-filtro-wrap" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none"></div>
+      <div id="cartao-filtro-wrap" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px;scrollbar-width:none"></div>
+      <!-- Filtro de portador — aparece só quando há dados com portador definido -->
+      <div id="cartao-portador-wrap" style="display:none;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:4px;scrollbar-width:none"></div>
 
       <div id="cartao-lanc-list"></div>
 
@@ -3577,7 +3579,8 @@ function parsearFatura(txt){
       catId:    autoCat(descLimpa, 'desp'),
       parcAtual,
       parcTotal,
-      nota:     secao==='adicional' ? 'Cartão adicional' : secao==='titular' ? 'Cartão titular' : '',
+      portador: secao,   // 'titular' | 'adicional' | 'desconhecido'
+      nota:     '',
       _sel:     selecionado
     });
   }
@@ -5390,7 +5393,8 @@ Retorne APENAS JSON válido:
 // ABA CARTÃO DE CRÉDITO — gestão de cartões, lançamento manual, import de fatura
 // ══════════════════════════════════════════════════════════════════════════════
 
-let cartaoFiltroId = 'todos'; // filtro de cartão na lista
+let cartaoFiltroId       = 'todos'; // filtro de cartão na lista
+let cartaoFiltroPortador = 'todos'; // 'todos' | 'titular' | 'adicional'
 let cartaoImpSelId = null;    // cartão selecionado durante import de fatura
 let parsedItemsFatura = [];   // itens pendentes de confirmação na revisão da fatura
 
@@ -5417,17 +5421,53 @@ function renderCartao(){
   garantirCartoesPadrao();
   renderCartaoResumoCards();
   renderCartaoFiltro();
+  renderCartaoPortadorFiltro();
   renderCartaoLancList();
   if(isPro()) gerarInsightCartaoIA();
+}
+
+function renderCartaoPortadorFiltro(){
+  const wrap = document.getElementById('cartao-portador-wrap');
+  if(!wrap) return;
+  const gastos = getGastosCartao();
+  // Verificar se há itens com portador definido
+  const temTitular   = gastos.some(g => g.portador === 'titular');
+  const temAdicional = gastos.some(g => g.portador === 'adicional');
+  if(!temTitular && !temAdicional){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
+  const opts = [
+    {v:'todos',    label:'👥 Todos'},
+    ...(temTitular   ? [{v:'titular',   label:'💳 Titular'}] : []),
+    ...(temAdicional ? [{v:'adicional', label:'➕ Adicional'}] : []),
+  ];
+  wrap.innerHTML = opts.map(o=>{
+    const sel = cartaoFiltroPortador === o.v;
+    return `<button onclick="setCartaoFiltroPortador('${o.v}')" style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:1.5px solid ${sel?'#a78bfa':'var(--bd)'};background:${sel?'rgba(167,139,250,.15)':'var(--s2)'};color:${sel?'#a78bfa':'var(--mu)'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">${o.label}</button>`;
+  }).join('');
+}
+
+function setCartaoFiltroPortador(v){
+  cartaoFiltroPortador = v;
+  renderCartaoPortadorFiltro();
+  renderCartaoResumoCards();
+  renderCartaoLancList();
 }
 
 function renderCartaoResumoCards(){
   const wrap = document.getElementById('cartao-resumo-cards');
   if(!wrap) return;
-  const gastos = getGastosCartao();
+  let gastos = getGastosCartao();
+  // Aplicar filtro de portador (titular/adicional)
+  if(cartaoFiltroPortador !== 'todos'){
+    gastos = gastos.filter(g=>{
+      const p = g.portador || 'desconhecido';
+      if(cartaoFiltroPortador === 'titular')   return p === 'titular'   || p === 'desconhecido';
+      if(cartaoFiltroPortador === 'adicional') return p === 'adicional';
+      return true;
+    });
+  }
   const porCartao = {};
   gastos.forEach(g => { porCartao[g.cartaoId] = (porCartao[g.cartaoId]||0) + g.valor; });
-
   const totalGeral = gastos.reduce((s,g)=>s+g.valor,0);
 
   let html = `<div style="flex-shrink:0;min-width:130px;background:linear-gradient(135deg,#6366f1,#4f46e5);border-radius:16px;padding:14px">
@@ -5471,6 +5511,15 @@ function renderCartaoLancList(){
   if(!list) return;
   let gastos = getGastosCartao().slice().sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   if(cartaoFiltroId !== 'todos') gastos = gastos.filter(g=>g.cartaoId===cartaoFiltroId);
+  // Filtro de portador
+  if(cartaoFiltroPortador !== 'todos'){
+    gastos = gastos.filter(g=>{
+      const p = g.portador || 'desconhecido';
+      if(cartaoFiltroPortador === 'titular')   return p === 'titular' || p === 'desconhecido';
+      if(cartaoFiltroPortador === 'adicional') return p === 'adicional';
+      return true;
+    });
+  }
 
   if(!gastos.length){
     list.innerHTML = `<div class="empty"><div class="empty-icon">💳</div><div class="empty-title">Nenhum gasto no cartão</div><div class="empty-sub">Importe uma fatura ou lance manualmente.</div></div>`;
@@ -5482,6 +5531,11 @@ function renderCartaoLancList(){
     const cartao = DB.cartoes.find(c=>c.id===g.cartaoId) || {nome:'Cartão',cor:'#64748b'};
     const dataFmt = g.data ? new Date(g.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
     const parcInfo = g.parcTotal>1 ? ` · ${g.parcAtual}/${g.parcTotal}` : '';
+    // Badge de portador — só exibe se há mistura de titular+adicional na lista
+    const temMistura = gastos.some(x=>(x.portador||'desconhecido')==='titular') && gastos.some(x=>x.portador==='adicional');
+    const portadorBadge = temMistura && g.portador==='adicional'
+      ? `<span style="font-size:9px;font-weight:700;color:#a78bfa;background:rgba(167,139,250,.12);border-radius:4px;padding:1px 5px;margin-left:4px">adicional</span>`
+      : '';
     const sel = _selIdsCartao.has(g.id);
 
     if(_selModoCartao){
@@ -5490,7 +5544,7 @@ function renderCartaoLancList(){
         <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
         <div class="lanc-info">
           <div class="lanc-desc">${g.desc}</div>
-          <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt} · <span style="color:${cartao.cor}">${cartao.nome}</span></div>
+          <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt} · <span style="color:${cartao.cor}">${cartao.nome}</span>${portadorBadge}</div>
         </div>
         <div class="lanc-val desp">-${fmtV(g.valor)}</div>
       </div>`;
@@ -5499,7 +5553,7 @@ function renderCartaoLancList(){
       <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
       <div class="lanc-info">
         <div class="lanc-desc">${g.desc}</div>
-        <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt} · <span style="color:${cartao.cor}">${cartao.nome}</span></div>
+        <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt} · <span style="color:${cartao.cor}">${cartao.nome}</span>${portadorBadge}</div>
       </div>
       <div class="lanc-val desp">-${fmtV(g.valor)}</div>
     </div>`;
@@ -6194,6 +6248,7 @@ function confirmarImportacaoFatura(){
       catId: it.catId,
       cartaoId: cartaoImpSelId,
       data: dataISO,
+      portador: it.portador || 'desconhecido',
       parcAtual: it.parcAtual||1,
       parcTotal: it.parcTotal||1
     });
