@@ -770,6 +770,16 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <button class="toggle" id="tgl-privacidade" onclick="togglePriv(this)"></button>
         </div>
       </div>
+      <div class="cfg-section">
+        <div class="section-title">Cartão de Crédito</div>
+        <div class="cfg-item" onclick="abrirConfigFechamento()" style="cursor:pointer">
+          <div>
+            <div class="cfg-label">Dia de fechamento da fatura</div>
+            <div class="cfg-sub" id="cfg-fechamento-sub">Não configurado — mostra por mês exato</div>
+          </div>
+          <div class="cfg-arrow">›</div>
+        </div>
+      </div>
       <!-- Seção instalar app -->
       <div class="cfg-section" id="cfg-instalar-section">
         <div class="section-title">Instalar app</div>
@@ -1442,7 +1452,7 @@ function navTo(tab){
   if(tab==='rel')     renderRel();
   if(tab==='imp')     initImpMes();
   if(tab==='cartao')  renderCartao();
-  if(tab==='cfg')     renderInstallSection();
+  if(tab==='cfg')     { renderInstallSection(); atualizarLabelFechamento(); }
 }
 
 // ── MÊS ───────────────────────────────────────────────────────────────────────
@@ -1458,6 +1468,7 @@ function mesAnterior(){
   renderMesLabel();
   if(currentTab==='inicio') renderInicio();
   if(currentTab==='lanc')   renderLanc();
+  if(currentTab==='cartao') renderCartao();
 }
 function mesSeguinte(){
   const [y,m]=currentMes.split('-').map(Number);
@@ -1467,6 +1478,7 @@ function mesSeguinte(){
   renderMesLabel();
   if(currentTab==='inicio') renderInicio();
   if(currentTab==='lanc')   renderLanc();
+  if(currentTab==='cartao') renderCartao();
 }
 function getLancs(ym){ return DB.lancamentos[ym]||[]; }
 function tRec(ym){ return getLancs(ym).filter(l=>l.tipo==='rec').reduce((s,l)=>s+l.valor,0); }
@@ -5448,10 +5460,33 @@ function garantirCartoesPadrao(){
 
 function mesAtualCartao(){ return currentMes || mesAtual(); }
 
+// Retorna todos os gastos do cartão cujo período de fatura corresponde ao mês exibido.
+// O período de uma fatura é: do dia (fechamento+1) do mês anterior até o dia fechamento do mês atual.
+// Ex: fechamento=25, mês=2026-06 → compras de 26/mai a 25/jun aparecem em Junho.
+// Se o gasto não tem data (legado), usa a chave do mês diretamente como fallback.
 function getGastosCartao(mes){
   mes = mes || mesAtualCartao();
-  if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
-  return DB.gastosCartao[mes];
+  const diaFech = parseInt(DB.settings?.diaFechamento) || 0;
+
+  // Sem dia de fechamento configurado — comportamento legado (chave exata)
+  if(!diaFech){
+    if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
+    return DB.gastosCartao[mes];
+  }
+
+  // Calcular intervalo do período de fatura
+  const [ano, m] = mes.split('-').map(Number);
+  // Início: dia seguinte ao fechamento no mês anterior
+  const dataIni = new Date(ano, m-2, diaFech+1); // mês anterior, dia fechamento+1
+  // Fim: dia de fechamento do mês atual
+  const dataFim = new Date(ano, m-1, diaFech);
+
+  // Varrer todos os meses do gastosCartao e filtrar pelo período
+  return Object.values(DB.gastosCartao || {}).flat().filter(g=>{
+    if(!g.data) return false; // sem data — ignorar (evita duplicar lançamentos legados)
+    const d = new Date(g.data + 'T12:00:00');
+    return d >= dataIni && d <= dataFim;
+  });
 }
 
 // ── RENDER PRINCIPAL DA ABA ──────────────────────────────────────────────────
@@ -5822,6 +5857,61 @@ function rodarParserFatura(){
   abrirRevisaoFatura();
 }
 
+function abrirConfigFechamento(){
+  const atual = DB.settings?.diaFechamento || '';
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--s1);border-radius:24px 24px 0 0;padding:24px 20px calc(28px + var(--safe-b));width:100%;max-width:480px;border-top:1px solid var(--bd)">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 18px"></div>
+      <div style="font-size:17px;font-weight:700;color:var(--tx);margin-bottom:6px">📅 Dia de fechamento da fatura</div>
+      <div style="font-size:13px;color:var(--mu);line-height:1.5;margin-bottom:18px">
+        Informe o dia em que sua fatura fecha. Assim, ao navegar entre meses na aba Cartão, você verá as compras do período correto da fatura.<br><br>
+        <strong style="color:var(--ts)">Exemplo:</strong> fechamento no dia 25 → a fatura de Junho mostra compras de 26/Mai a 25/Jun.
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--s2);border:1.5px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:18px">
+        <span style="font-size:16px;color:var(--mu)">Dia</span>
+        <input id="input-fechamento" type="number" inputmode="numeric" min="1" max="28" value="${atual}" placeholder="Ex: 25" style="flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-size:22px;font-weight:700;font-family:inherit">
+        <span style="font-size:13px;color:var(--mu)">de cada mês</span>
+      </div>
+      <button onclick="salvarFechamento()" style="width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--gr),var(--gr2));color:#06281d;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:8px">Salvar</button>
+      ${atual ? `<button onclick="removerFechamento()" style="width:100%;padding:12px;border-radius:14px;border:none;background:transparent;color:var(--rd);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Remover configuração</button>` : ''}
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:12px;border-radius:14px;border:none;background:transparent;color:var(--mu);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Cancelar</button>
+    </div>`;
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
+  setTimeout(()=>document.getElementById('input-fechamento')?.focus(), 200);
+}
+
+function salvarFechamento(){
+  const val = parseInt(document.getElementById('input-fechamento').value);
+  if(!val || val < 1 || val > 28){ showToast('Digite um dia entre 1 e 28'); return; }
+  if(!DB.settings) DB.settings = {};
+  DB.settings.diaFechamento = val;
+  dbSave();
+  atualizarLabelFechamento();
+  document.querySelector('div[style*="z-index:9000"]')?.remove();
+  showToast(`Fechamento configurado para o dia ${val} ✓`);
+  if(currentTab==='cartao') renderCartao();
+}
+
+function removerFechamento(){
+  if(!DB.settings) DB.settings = {};
+  DB.settings.diaFechamento = 0;
+  dbSave();
+  atualizarLabelFechamento();
+  document.querySelector('div[style*="z-index:9000"]')?.remove();
+  showToast('Configuração removida');
+  if(currentTab==='cartao') renderCartao();
+}
+
+function atualizarLabelFechamento(){
+  const el = document.getElementById('cfg-fechamento-sub');
+  if(!el) return;
+  const dia = DB.settings?.diaFechamento;
+  el.textContent = dia ? `Fatura fecha todo dia ${dia}` : 'Não configurado — mostra por mês exato';
+}
+
 function renderDiagnosticoSection(){
   const secao = document.getElementById('cfg-diagnostico-section');
   const sub = document.getElementById('cfg-diagnostico-sub');
@@ -6143,7 +6233,6 @@ function copiarDebugFatura(){
 
 function confirmarImportacaoFatura(){
   const mes = mesAtualCartao();
-  if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
 
   parsedItemsFatura.forEach(it=>{
     // Converter data DD/MM para AAAA-MM-DD
@@ -6155,11 +6244,16 @@ function confirmarImportacaoFatura(){
       const anoFatura = parseInt(mes.slice(0,4));
       const mesFatura = parseInt(mes.slice(5,7));
       const mesLanc   = parseInt(mm);
-      // Lançamento em mês posterior ao mês da fatura → deve ser do ano anterior
       const ano = mesLanc > mesFatura + 1 ? anoFatura - 1 : anoFatura;
       dataISO = `${ano}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
     }
-    DB.gastosCartao[mes].push({
+
+    // Salvar na chave do mês real da data da compra (não do mês da fatura).
+    // Assim getGastosCartao() com filtro por período funciona corretamente ao
+    // navegar entre meses — cada compra fica no seu mês real de ocorrência.
+    const chaveMes = dataISO.slice(0, 7); // "AAAA-MM"
+    if(!DB.gastosCartao[chaveMes]) DB.gastosCartao[chaveMes] = [];
+    DB.gastosCartao[chaveMes].push({
       id: 'gc'+Date.now()+Math.random().toString(36).slice(2,7),
       valor: it.valor,
       desc: it.desc,
