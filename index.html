@@ -5460,42 +5460,13 @@ function garantirCartoesPadrao(){
 
 function mesAtualCartao(){ return currentMes || mesAtual(); }
 
-// Retorna todos os gastos do cartão cujo período de fatura corresponde ao mês exibido.
-// O período de uma fatura é: do dia (fechamento+1) do mês anterior até o dia fechamento do mês atual.
-// Ex: fechamento=25, mês=2026-06 → compras de 26/mai a 25/jun aparecem em Junho.
-// Se o gasto não tem data (legado), usa a chave do mês diretamente como fallback.
+// Retorna os gastos do cartão do mês exibido — funciona igual à aba Lanç:
+// cada gasto pertence ao mês em que foi importado ou lançado manualmente.
+// Não há lógica de data de fechamento ou período de fatura.
 function getGastosCartao(mes){
   mes = mes || mesAtualCartao();
-  const diaFech = parseInt(DB.settings?.diaFechamento) || 0;
-  const [ano, m] = mes.split('-').map(Number);
-
-  let dataIni, dataFim;
-
-  if(diaFech){
-    // Com fechamento configurado: período de fatura
-    // Ex: fechamento=25, mês=Jun → 26/Mai a 25/Jun
-    dataIni = new Date(ano, m-2, diaFech+1);
-    dataFim = new Date(ano, m-1, diaFech);
-  } else {
-    // Sem fechamento: mês calendário completo (01 ao último dia do mês)
-    dataIni = new Date(ano, m-1, 1);
-    dataFim = new Date(ano, m, 0); // dia 0 do mês seguinte = último dia do mês atual
-  }
-
-  // Filtrar todos os gastos de todos os meses pela data real da compra
-  const todos = Object.values(DB.gastosCartao || {}).flat();
-
-  // Gastos com data: filtrar pelo intervalo
-  const comData = todos.filter(g => {
-    if(!g.data) return false;
-    const d = new Date(g.data + 'T12:00:00');
-    return d >= dataIni && d <= dataFim;
-  });
-
-  // Gastos sem data (legado): usar chave do mês como fallback
-  const semData = (DB.gastosCartao[mes] || []).filter(g => !g.data);
-
-  return [...comData, ...semData];
+  if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
+  return DB.gastosCartao[mes];
 }
 
 // ── RENDER PRINCIPAL DA ABA ──────────────────────────────────────────────────
@@ -6242,11 +6213,12 @@ function copiarDebugFatura(){
 
 function confirmarImportacaoFatura(){
   const mes = mesAtualCartao();
+  if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
 
   parsedItemsFatura.forEach(it=>{
-    // Converter data DD/MM para AAAA-MM-DD
-    // O ano é inferido: se o mês do lançamento for maior que o mês atual da fatura,
-    // assume ano anterior (parcelamento antigo), senão usa o ano da fatura.
+    // Converter data DD/MM para AAAA-MM-DD (para exibição)
+    // O ano é inferido: se o mês do lançamento for maior que o mês da fatura,
+    // assume ano anterior (parcelamento antigo).
     let dataISO = new Date().toISOString().slice(0,10);
     if(it.data && it.data.includes('/')){
       const [dd, mm] = it.data.split('/');
@@ -6257,12 +6229,9 @@ function confirmarImportacaoFatura(){
       dataISO = `${ano}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
     }
 
-    // Salvar na chave do mês real da data da compra (não do mês da fatura).
-    // Assim getGastosCartao() com filtro por período funciona corretamente ao
-    // navegar entre meses — cada compra fica no seu mês real de ocorrência.
-    const chaveMes = dataISO.slice(0, 7); // "AAAA-MM"
-    if(!DB.gastosCartao[chaveMes]) DB.gastosCartao[chaveMes] = [];
-    DB.gastosCartao[chaveMes].push({
+    // Salvar na chave do mês selecionado — igual à aba Lanç.
+    // A data real da compra fica salva no campo `data` para ordenação e exibição.
+    DB.gastosCartao[mes].push({
       id: 'gc'+Date.now()+Math.random().toString(36).slice(2,7),
       valor: it.valor,
       desc: it.desc,
