@@ -1568,9 +1568,20 @@ function renderInicio(){
     </div>`;
   })() : '';
 
-  // KPIs
-  const parcAtivas = lancs.filter(l=>l.parcTotal>1&&l.tipo==='desp');
-  const totalParc = parcAtivas.reduce((s,l)=>s+l.valor,0);
+  // KPIs — parcelas: total restante a pagar em TODOS os meses (não só o atual)
+  const todasParcConta = Object.values(DB.lancamentos||{}).flat()
+    .filter(l=>l.parcTotal>1 && l.tipo==='desp');
+  const todasParcCartao = Object.values(DB.gastosCartao||{}).flat()
+    .filter(g=>g.parcTotal>1);
+  const vistosParcKpi = new Set();
+  const parcUnicas = [...todasParcConta, ...todasParcCartao].filter(p=>{
+    const chave = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`;
+    if(vistosParcKpi.has(chave)) return false;
+    vistosParcKpi.add(chave); return true;
+  });
+  const totalRestanteKpi = parcUnicas.reduce((s,p)=>{
+    return s + Math.max(0, p.parcTotal - p.parcAtual + 1) * p.valor;
+  }, 0);
   const cats = DB.categorias.filter(c=>c.tipo==='desp'||c.tipo==='both');
   const topCat = (() => {
     const map={};
@@ -1589,8 +1600,8 @@ function renderInicio(){
     <div class="kpi-grid">
       <div class="kpi" onclick="abrirPainelDividas()" style="cursor:pointer">
         <div class="kpi-icon">📦</div>
-        <div class="kpi-label">Parcelas ativas ›</div>
-        <div class="kpi-value" style="color:var(--am)">${fmtV(totalParc)}</div>
+        <div class="kpi-label">A pagar (parcelas) ›</div>
+        <div class="kpi-value" style="color:var(--am);font-size:${totalRestanteKpi>=10000?'13px':'16px'}">${fmtV(totalRestanteKpi)}</div>
       </div>
       <div class="kpi">
         <div class="kpi-icon">🏆</div>
@@ -1791,59 +1802,213 @@ function removerOrcamento(){
 }
 
 // ── PAINEL DE DÍVIDAS E PARCELAS ──────────────────────────────────────────────
-// Visão consolidada de tudo que está parcelado (conta + cartão), com quanto
-// ainda falta pagar e quando cada compromisso termina. Pensado para dar
-// tranquilidade e clareza a quem tem medo de se perder nas dívidas.
-function abrirPainelDividas(){
-  // Coletar parcelas de conta corrente e de cartão
+function _getParcelas(){
   const parcConta = Object.values(DB.lancamentos||{}).flat()
     .filter(l=>l.parcTotal>1 && l.tipo==='desp')
-    .map(l=>({...l, origem:'Conta'}));
+    .map(l=>({...l, origem:'conta', _mes: Object.keys(DB.lancamentos).find(m=>DB.lancamentos[m].some(x=>x.id===l.id))}));
   const parcCartao = Object.values(DB.gastosCartao||{}).flat()
     .filter(g=>g.parcTotal>1)
-    .map(g=>({...g, origem:'Cartão'}));
+    .map(g=>({...g, origem:'cartao', _mes: Object.keys(DB.gastosCartao).find(m=>DB.gastosCartao[m].some(x=>x.id===g.id))}));
 
-  // Deduplicar por descrição+valor+parcelas (mesma compra aparece em vários meses)
-  const todasRaw = [...parcConta, ...parcCartao];
-  const vistos = new Set();
-  const parcelas = todasRaw.filter(p=>{
-    const chave = `${p.desc}|${p.valor.toFixed(2)}|${p.parcTotal}`;
-    if(vistos.has(chave)) return false;
-    vistos.add(chave);
-    return true;
+  // Deduplicar — guardar TODOS os IDs de um mesmo parcelamento para exclusão completa
+  const grupos = {};
+  [...parcConta, ...parcCartao].forEach(p=>{
+    const chave = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`;
+    if(!grupos[chave]) grupos[chave] = {rep: p, ids: []};
+    grupos[chave].ids.push({id: p.id, mes: p._mes, origem: p.origem});
+    // Manter o representante com a menor parcela (mais antiga = mais info sobre o início)
+    if(p.parcAtual < grupos[chave].rep.parcAtual) grupos[chave].rep = p;
   });
+  return Object.values(grupos);
+}
 
-  // Calcular total que ainda falta pagar
+function excluirParcela(chave, modalEl){
+  const grupos = _getParcelas();
+  const grupo = grupos.find(g=>`${g.rep.desc}|${Number(g.rep.valor).toFixed(2)}|${g.rep.parcTotal}` === chave);
+  if(!grupo) return;
+
+  if(!confirm(`Excluir todas as ${grupo.ids.length} parcela(s) de "${grupo.rep.desc}" do seu histórico?`)) return;
+
+  grupo.ids.forEach(({id, mes, origem})=>{
+    if(origem==='conta' && DB.lancamentos[mes]){
+      DB.lancamentos[mes] = DB.lancamentos[mes].filter(l=>l.id!==id);
+    } else if(origem==='cartao' && DB.gastosCartao[mes]){
+      DB.gastosCartao[mes] = DB.gastosCartao[mes].filter(g=>g.id!==id);
+    }
+  });
+  dbSave();
+  showToast('Parcelas excluídas ✓');
+  // Refresh do painel e da tela inicial
+  modalEl.remove();
+  renderInicio();
+  abrirPainelDividas();
+}
+
+function abrirFormNovaParcela(modalEl){
+  const cats = DB.categorias.filter(c=>c.tipo==='desp');
+  const cartoes = DB.cartoes||[];
+  const form = document.createElement('div');
+  form.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9100;display:flex;align-items:flex-end;justify-content:center';
+  form.innerHTML = `
+    <div style="background:var(--s1);border-radius:24px 24px 0 0;padding:22px 20px calc(28px + var(--safe-b));width:100%;max-width:480px;max-height:90vh;overflow-y:auto;border-top:1px solid var(--bd)">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 16px"></div>
+      <div style="font-size:16px;font-weight:700;color:var(--tx);margin-bottom:16px">➕ Nova compra parcelada</div>
+
+      <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Descrição</div>
+      <input id="_np-desc" type="text" placeholder="Ex: Geladeira, Celular..." style="width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--tx);font-size:14px;font-family:inherit;margin-bottom:14px;outline:none">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Valor da parcela (R$)</div>
+          <input id="_np-valor" type="number" inputmode="decimal" placeholder="0,00" style="width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--tx);font-size:14px;font-family:inherit;outline:none">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Total de parcelas</div>
+          <input id="_np-total" type="number" inputmode="numeric" placeholder="Ex: 12" style="width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--tx);font-size:14px;font-family:inherit;outline:none">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Parcela atual</div>
+          <input id="_np-atual" type="number" inputmode="numeric" placeholder="Ex: 1" value="1" style="width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--tx);font-size:14px;font-family:inherit;outline:none">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Mês de início</div>
+          <input id="_np-mes" type="month" value="${currentMes}" style="width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--tx);font-size:14px;font-family:inherit;outline:none">
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Categoria</div>
+      <select id="_np-cat" style="width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--tx);font-size:14px;font-family:inherit;margin-bottom:14px;outline:none">
+        ${cats.map(c=>`<option value="${c.id}">${c.icone} ${c.nome}</option>`).join('')}
+      </select>
+
+      <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Registrar em</div>
+      <div style="display:flex;gap:8px;margin-bottom:18px">
+        <button id="_np-tipo-conta" onclick="_npSetTipo('conta',this)" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--gr);background:rgba(45,217,143,.1);color:var(--gr);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">💰 Conta corrente</button>
+        <button id="_np-tipo-cartao" onclick="_npSetTipo('cartao',this)" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--bd);background:transparent;color:var(--mu);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">💳 Cartão</button>
+      </div>
+      <div id="_np-cartao-wrap" style="display:none;margin-bottom:14px">
+        <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Qual cartão?</div>
+        <select id="_np-cartao" style="width:100%;background:var(--s2);border:1.5px solid var(--bd);border-radius:12px;padding:12px 14px;color:var(--tx);font-size:14px;font-family:inherit;outline:none">
+          ${cartoes.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}
+        </select>
+      </div>
+
+      <button onclick="salvarNovaParcela(this)" style="width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--gr),var(--gr2));color:#06281d;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:8px">Salvar parcelamento</button>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:12px;border-radius:14px;border:none;background:transparent;color:var(--mu);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Cancelar</button>
+    </div>`;
+  form.onclick = e=>{ if(e.target===form) form.remove(); };
+  document.body.appendChild(form);
+  window._npTipo = 'conta';
+  setTimeout(()=>document.getElementById('_np-desc')?.focus(), 200);
+}
+
+function _npSetTipo(tipo, btn){
+  window._npTipo = tipo;
+  document.getElementById('_np-tipo-conta').style.cssText += ';border-color:var(--bd);background:transparent;color:var(--mu)';
+  document.getElementById('_np-tipo-cartao').style.cssText += ';border-color:var(--bd);background:transparent;color:var(--mu)';
+  btn.style.cssText += tipo==='conta'
+    ? ';border-color:var(--gr);background:rgba(45,217,143,.1);color:var(--gr)'
+    : ';border-color:var(--bl);background:rgba(91,141,239,.1);color:var(--bl)';
+  document.getElementById('_np-cartao-wrap').style.display = tipo==='cartao' ? '' : 'none';
+}
+
+function salvarNovaParcela(btn){
+  const desc   = document.getElementById('_np-desc').value.trim();
+  const valor  = parseFloat(document.getElementById('_np-valor').value);
+  const total  = parseInt(document.getElementById('_np-total').value);
+  const atual  = parseInt(document.getElementById('_np-atual').value) || 1;
+  const mesBas = document.getElementById('_np-mes').value; // AAAA-MM
+  const catId  = document.getElementById('_np-cat').value;
+  const cartaoId = document.getElementById('_np-cartao')?.value;
+  const tipo   = window._npTipo || 'conta';
+
+  if(!desc){ showToast('Digite a descrição'); return; }
+  if(!valor || valor<=0){ showToast('Digite o valor da parcela'); return; }
+  if(!total || total<2){ showToast('Total de parcelas precisa ser pelo menos 2'); return; }
+  if(!mesBas){ showToast('Escolha o mês de início'); return; }
+
+  // Criar uma entrada por parcela a partir do mês/parcela atual
+  let criados = 0;
+  for(let i=atual; i<=total; i++){
+    // Calcular o mês deste lançamento: mês base + (i - atual) meses
+    const [ano, mes] = mesBas.split('-').map(Number);
+    const d = new Date(ano, mes-1 + (i-atual), 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+
+    if(tipo==='conta'){
+      if(!DB.lancamentos[ym]) DB.lancamentos[ym] = [];
+      DB.lancamentos[ym].push({
+        id: '_p'+Date.now()+Math.random().toString(36).slice(2,6),
+        data: `${ym}-01`,
+        desc, valor, tipo:'desp', catId,
+        parcAtual: i, parcTotal: total, nota:''
+      });
+    } else {
+      if(!DB.gastosCartao[ym]) DB.gastosCartao[ym] = [];
+      DB.gastosCartao[ym].push({
+        id: '_p'+Date.now()+Math.random().toString(36).slice(2,6),
+        data: `${ym}-01`,
+        desc, valor, catId,
+        cartaoId: cartaoId || DB.cartoes[0]?.id,
+        parcAtual: i, parcTotal: total
+      });
+    }
+    criados++;
+  }
+
+  dbSave();
+  showToast(`${criados} parcela(s) salvas ✓`);
+  btn.closest('div[style*=fixed]').remove();
+  // Fechar o painel anterior e reabrir atualizado
+  document.querySelectorAll('div[style*="z-index:9000"]').forEach(el=>el.remove());
+  renderInicio();
+  abrirPainelDividas();
+}
+
+function abrirPainelDividas(){
+  const grupos = _getParcelas();
   let totalRestante = 0;
-  parcelas.forEach(p=>{
-    const restantes = Math.max(0, p.parcTotal - p.parcAtual + 1);
-    totalRestante += restantes * p.valor;
+  grupos.forEach(g=>{
+    const p = g.rep;
+    totalRestante += Math.max(0, p.parcTotal - p.parcAtual + 1) * p.valor;
   });
 
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9000;display:flex;align-items:flex-end;justify-content:center';
 
-  const listaHtml = parcelas.length ? parcelas
-    .sort((a,b)=>(b.parcTotal-b.parcAtual)-(a.parcTotal-a.parcAtual))
-    .map(p=>{
+  const listaHtml = grupos.length ? grupos
+    .sort((a,b)=>{
+      const ra = Math.max(0, a.rep.parcTotal-a.rep.parcAtual+1);
+      const rb = Math.max(0, b.rep.parcTotal-b.rep.parcAtual+1);
+      return rb - ra;
+    })
+    .map(({rep: p, ids})=>{
       const cat = DB.categorias.find(c=>c.id===p.catId) || {icone:'💸',nome:'Outros'};
       const restantes = Math.max(0, p.parcTotal - p.parcAtual + 1);
       const faltaPagar = restantes * p.valor;
       const pctPago = Math.round((p.parcAtual-1)/p.parcTotal*100);
+      const chave = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`.replace(/'/g,"\\'");
+      const origemLabel = ids[0].origem === 'conta' ? '💰 Conta' : '💳 Cartão';
       return `<div style="background:var(--s2);border-radius:14px;padding:14px;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
           <div style="font-size:20px">${cat.icone}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.desc}</div>
-            <div style="font-size:11px;color:var(--mu)">${p.origem} · parcela ${p.parcAtual} de ${p.parcTotal}</div>
+            <div style="font-size:11px;color:var(--mu)">${origemLabel} · parcela ${p.parcAtual} de ${p.parcTotal}</div>
           </div>
-          <div style="text-align:right">
-            <div style="font-size:13px;font-weight:700;color:var(--am)">${fmtV(p.valor)}</div>
-            <div style="font-size:10px;color:var(--mu)">por mês</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="text-align:right">
+              <div style="font-size:13px;font-weight:700;color:var(--am)">${fmtV(p.valor)}</div>
+              <div style="font-size:10px;color:var(--mu)">por mês</div>
+            </div>
+            <button onclick="excluirParcela('${chave}', this.closest('div[style*=fixed]'))" title="Excluir" style="background:rgba(255,122,122,.1);border:1px solid rgba(255,122,122,.25);border-radius:8px;padding:6px 8px;color:var(--rd);font-size:14px;cursor:pointer;line-height:1">🗑</button>
           </div>
         </div>
         <div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:6px">
-          <div style="height:100%;width:${pctPago}%;background:var(--gr)"></div>
+          <div style="height:100%;width:${pctPago}%;background:var(--gr);transition:width .4s"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:11px">
           <span style="color:var(--gr)">${pctPago}% pago</span>
@@ -1855,21 +2020,22 @@ function abrirPainelDividas(){
 
   modal.innerHTML = `
     <div style="background:var(--s1);border-radius:24px 24px 0 0;padding:24px 20px calc(28px + var(--safe-b));width:100%;max-width:480px;max-height:85vh;overflow-y:auto;border-top:1px solid var(--bd)">
-      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 18px"></div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 14px"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
         <span style="font-size:20px">📦</span>
-        <span style="font-size:17px;font-weight:700;color:var(--tx)">Minhas parcelas</span>
+        <span style="font-size:17px;font-weight:700;color:var(--tx);flex:1">Minhas parcelas</span>
+        <button onclick="abrirFormNovaParcela(this.closest('div[style*=fixed]'))" style="padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--gr),var(--gr2));color:#06281d;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">+ Adicionar</button>
       </div>
-      ${parcelas.length ? `
+      ${grupos.length ? `
       <div style="background:linear-gradient(135deg,rgba(255,194,75,.12),rgba(255,122,122,.06));border:1px solid rgba(255,194,75,.25);border-radius:16px;padding:16px;margin:14px 0 18px">
         <div style="font-size:12px;color:var(--ts);margin-bottom:4px">Ainda falta pagar no total</div>
         <div style="font-size:26px;font-weight:800;color:var(--am)">${fmtV(totalRestante)}</div>
-        <div style="font-size:11px;color:var(--mu);margin-top:4px">distribuído nas próximas parcelas</div>
+        <div style="font-size:11px;color:var(--mu);margin-top:4px">${grupos.length} parcelamento(s) em andamento</div>
       </div>` : ''}
-      ${listaHtml}
+      <div id="_painel-lista">${listaHtml}</div>
       <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:8px;padding:13px;border-radius:14px;border:none;background:var(--s2);color:var(--tx);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Fechar</button>
     </div>`;
-  modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
   document.body.appendChild(modal);
 }
 
