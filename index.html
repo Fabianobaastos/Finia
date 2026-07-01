@@ -1847,18 +1847,29 @@ function _parcAtualHoje(parcAtualOriginal, mesSalvo){
 }
 
 function _getParcelas(){
-  const parcConta = Object.values(DB.lancamentos||{}).flat()
-    .filter(l=>l.parcTotal>1 && l.tipo==='desp')
-    .map(l=>({
-      ...l, origem:'conta',
-      _mesSalvo: l.data ? l.data.slice(0,7) : currentMes
-    }));
-  const parcCartao = Object.values(DB.gastosCartao||{}).flat()
-    .filter(g=>g.parcTotal>1)
-    .map(g=>({
-      ...g, origem:'cartao',
-      _mesSalvo: g.data ? g.data.slice(0,7) : currentMes
-    }));
+  // Para cada item precisamos saber em qual chave do DB ele está salvo (para exclusão correta)
+  // e qual a data da compra (para correção temporal). São coisas diferentes!
+  const parcConta = [];
+  Object.entries(DB.lancamentos||{}).forEach(([chaveMes, lancs])=>{
+    lancs.filter(l=>l.parcTotal>1 && l.tipo==='desp').forEach(l=>{
+      parcConta.push({
+        ...l, origem:'conta',
+        _chaveMesDB: chaveMes,           // onde está salvo no DB (para deletar)
+        _mesSalvo: l.data ? l.data.slice(0,7) : chaveMes  // data real da compra (para correção temporal)
+      });
+    });
+  });
+
+  const parcCartao = [];
+  Object.entries(DB.gastosCartao||{}).forEach(([chaveMes, gastos])=>{
+    gastos.filter(g=>g.parcTotal>1).forEach(g=>{
+      parcCartao.push({
+        ...g, origem:'cartao',
+        _chaveMesDB: chaveMes,           // onde está salvo no DB (para deletar)
+        _mesSalvo: g.data ? g.data.slice(0,7) : chaveMes  // data real da compra (para correção temporal)
+      });
+    });
+  });
 
   const grupos = {};
   [...parcConta, ...parcCartao].forEach(p=>{
@@ -1866,15 +1877,15 @@ function _getParcelas(){
     if(!grupos[chave]){
       grupos[chave] = {rep: p, ids: [], _mesSalvoMin: p._mesSalvo};
     }
-    grupos[chave].ids.push({id: p.id, mes: p._mesSalvo, origem: p.origem});
-    // Manter o representante mais antigo (início real do parcelamento)
+    // ids usa _chaveMesDB para garantir que a exclusão aconteça no lugar certo
+    grupos[chave].ids.push({id: p.id, mes: p._chaveMesDB, origem: p.origem});
+    // Representante mais antigo pela data real da compra
     if(p._mesSalvo < grupos[chave]._mesSalvoMin){
       grupos[chave]._mesSalvoMin = p._mesSalvo;
       grupos[chave].rep = p;
     }
   });
 
-  // Calcular parcela vigente hoje e filtrar já quitados
   return Object.values(grupos).map(g=>({
     ...g,
     parcAtualHoje: _parcAtualHoje(g.rep.parcAtual, g._mesSalvoMin)
