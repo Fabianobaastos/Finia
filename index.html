@@ -6056,23 +6056,29 @@ async function rodarParserFaturaIA(){
     for(let i=0; i<blocos.length; i++){
       statusEl.textContent = `✨ Analisando parte ${i+1} de ${blocos.length}...`;
 
-      const prompt = `Extraia TODOS os lançamentos de compra/saque desta PARTE de uma fatura de cartão de crédito brasileira (pode haver múltiplos portadores/cartões adicionais — extraia de todos).
+      const prompt = `Extraia TODOS os lançamentos de compra/saque desta PARTE de uma fatura de cartão de crédito brasileira.
 
 CATEGORIAS DISPONÍVEIS: ${cats}
 
 TEXTO DA FATURA (parte ${i+1} de ${blocos.length}):
 ${blocos[i]}
 
-Retorne APENAS JSON: {"itens":[{"data":"DD/MM","desc":"nome do estabelecimento","valor":99.90,"categoria":"NomeCategoria","parcAtual":1,"parcTotal":1}]}
+Retorne APENAS JSON: {"itens":[{"data":"DD/MM","desc":"nome do estabelecimento","valor":99.90,"categoria":"NomeCategoria","parcAtual":1,"parcTotal":1,"portador":"titular"}]}
+
+CAMPO PORTADOR — identifique a qual portador pertence cada lançamento:
+- Faturas com múltiplos cartões/portadores geralmente têm seções separadas por nome, ex: "JOAO SILVA (final 1234)" ou "Titular" / "Adicional"
+- Use "titular" para lançamentos do portador principal (quem emitiu o cartão)
+- Use "adicional" para lançamentos de cartões adicionais (cônjuge, filhos, etc.)
+- Use "desconhecido" se não conseguir determinar o portador
 
 REGRAS IMPORTANTES:
 - Ignore totais, subtotais, juros, encargos, IOF, limites de crédito e linhas de cabeçalho/rodapé
-- Ignore anuidades que tenham um estorno correspondente na mesma fatura (se cobrança e estorno aparecem, ambos se anulam — não inclua nenhum dos dois)
-- Ignore qualquer linha com valor negativo ou marcada como estorno/crédito/devolução — não são gastos novos
+- Ignore anuidades que tenham um estorno correspondente na mesma fatura (se cobrança e estorno aparecem, ambos se anulam)
+- Ignore qualquer linha com valor negativo ou marcada como estorno/crédito/devolução
 - Detecte parcelamentos no formato "01/03" no final da descrição (parcAtual/parcTotal)
-- Lançamentos internacionais (em moeda estrangeira convertida para R$) também devem ser incluídos — use o valor já em reais
+- Lançamentos internacionais já convertidos para R$ devem ser incluídos normalmente
 - Se não conseguir identificar a categoria, use "Outros gastos"
-- Esta é apenas uma PARTE do documento — pode haver lançamentos cortados no início ou fim deste trecho; ignore linhas incompletas que não tenham data+valor claros`;
+- Esta é apenas uma PARTE do documento — ignore linhas incompletas sem data+valor claros`;
 
       // Retry automático — se a chamada falhar (ex: timeout da função serverless),
       // tenta de novo até 2 vezes antes de desistir desse bloco.
@@ -6105,6 +6111,11 @@ REGRAS IMPORTANTES:
 
     parsedItemsFatura = todosItens.map(it=>{
       const cat = DB.categorias.find(c=>c.nome.toLowerCase() === (it.categoria||'').toLowerCase());
+      // Normalizar portador retornado pela IA
+      const portadorRaw = (it.portador||'').toLowerCase().trim();
+      const portador = portadorRaw === 'titular' ? 'titular'
+                     : portadorRaw === 'adicional' ? 'adicional'
+                     : 'desconhecido';
       return {
         data: it.data,
         desc: it.desc,
@@ -6113,6 +6124,7 @@ REGRAS IMPORTANTES:
         catId: cat ? cat.id : DB.categorias.find(c=>c.nome==='Outros gastos')?.id,
         parcAtual: it.parcAtual||1,
         parcTotal: it.parcTotal||1,
+        portador,
         nota: '',
         _sel: true
       };
