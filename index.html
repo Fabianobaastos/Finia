@@ -953,6 +953,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button class="imp-type-btn active" id="lanc-tipo-desp" onclick="selLancTipo('desp')">↑ Saída</button>
       <button class="imp-type-btn" id="lanc-tipo-rec" onclick="selLancTipo('rec')">↓ Entrada</button>
+      <button class="imp-type-btn" id="lanc-tipo-invest" onclick="selLancTipo('invest')" style="border-color:var(--am)">💎 Investimento</button>
     </div>
     <div class="form-group">
       <label class="form-label">Valor (R$)</label>
@@ -1085,6 +1086,7 @@ let DB = {
   uso: {importacoesMes: {}, lancamentosMes: {}},
   saldoConta: null,        // saldo real da conta bancária
   saldoContaData: null,    // data de referência do saldo
+  saldoInvestimento: 0,    // saldo acumulado de investimentos/poupança
   cartoes: [],             // [{id, nome, cor}] — ex: Nubank, Itaú, Bradesco
   gastosCartao: {},        // {AAAA-MM: [{id, cartaoId, catId, valor, desc, data}]}
 };
@@ -1505,7 +1507,9 @@ function mesSeguinte(){
 function getLancs(ym){ return DB.lancamentos[ym]||[]; }
 function tRec(ym){ return getLancs(ym).filter(l=>l.tipo==='rec').reduce((s,l)=>s+l.valor,0); }
 function tDesp(ym){ return getLancs(ym).filter(l=>l.tipo==='desp').reduce((s,l)=>s+l.valor,0); }
-function saldo(ym){ return tRec(ym)-tDesp(ym); }
+function tInvest(ym){ return getLancs(ym).filter(l=>l.tipo==='invest').reduce((s,l)=>s+l.valor,0); }
+// Saldo do mês: receitas - despesas (investimentos não contam como gasto, são transferência)
+function saldo(ym){ return tRec(ym) - tDesp(ym) - tInvest(ym); }
 
 // ── TELA INÍCIO ───────────────────────────────────────────────────────────────
 function calcularSaldoAtual(){
@@ -1549,7 +1553,6 @@ function renderInicio(){
   document.getElementById('hero-wrap').innerHTML=`
     <div class="hero-card fade-up">
       ${temSaldoConta ? `
-      <!-- Saldo calculado dinamicamente -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
         <div class="hero-label">Saldo em conta</div>
         <div style="font-size:10px;color:rgba(255,255,255,.3);cursor:pointer" onclick="abrirModalSaldo()">✎ atualizar base</div>
@@ -1558,7 +1561,6 @@ function renderInicio(){
       <div style="font-size:10px;color:rgba(255,255,255,.3);margin-bottom:16px">Base: ${fmtV(DB.saldoConta)} em ${saldoBaseData} + lançamentos</div>
       <div style="height:1px;background:rgba(255,255,255,.08);margin-bottom:14px"></div>
       ` : `
-      <!-- Sem saldo base — botão para inserir -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div>
           <div class="hero-label" style="margin-bottom:4px">Saldo em conta</div>
@@ -1569,7 +1571,6 @@ function renderInicio(){
         </button>
       </div>
       `}
-      <!-- Resultado do mês -->
       <div class="hero-label" style="margin-bottom:4px">Resultado do mês</div>
       <div class="hero-value ${sal>=0?'pos':'neg'}" style="font-size:26px;margin-bottom:12px">${fmtV(sal)}</div>
       <div class="hero-row">
@@ -1581,8 +1582,25 @@ function renderInicio(){
           <div class="hero-stat-l">Saídas</div>
           <div class="hero-stat-v" style="color:var(--rd)">${fmtV(desp)}</div>
         </div>
+        ${tInvest(ym)>0 ? `
+        <div class="hero-stat">
+          <div class="hero-stat-l">💎 Investido</div>
+          <div class="hero-stat-v" style="color:var(--am)">${fmtV(tInvest(ym))}</div>
+        </div>` : ''}
       </div>
-    </div>`;
+    </div>
+
+    ${(DB.saldoInvestimento||0) > 0 ? `
+    <div onclick="abrirModalInvestimento()" style="background:linear-gradient(135deg,rgba(255,194,75,.12),rgba(255,194,75,.04));border:1px solid rgba(255,194,75,.3);border-radius:16px;padding:16px;margin-top:10px;cursor:pointer;display:flex;align-items:center;gap:14px">
+      <div style="font-size:28px">💎</div>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;color:var(--am);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Meus investimentos</div>
+        <div style="font-size:22px;font-weight:800;color:var(--am)">${fmtV(DB.saldoInvestimento)}</div>
+        <div style="font-size:11px;color:var(--mu);margin-top:2px">saldo acumulado · toque para ajustar</div>
+      </div>
+      <div style="color:var(--mu);font-size:20px">›</div>
+    </div>` : ''}
+  `;
 
   // Barra de uso Free (só mostra se não for Pro)
   const usoHtml = !isPro() ? (()=>{
@@ -1602,35 +1620,33 @@ function renderInicio(){
     </div>`;
   })() : '';
 
-  // KPIs — parcelas: total restante a pagar, descontando os meses já passados
-  // desde a data/mês em que cada parcela foi registrada.
-  const mesAtualNum = (()=>{ const [y,m]=currentMes.split('-').map(Number); return y*12+m; })();
-  const todasParcConta = Object.values(DB.lancamentos||{}).flat()
-    .filter(l=>l.parcTotal>1 && l.tipo==='desp')
-    .map(l=>({...l, _chaveMes: l.data ? l.data.slice(0,7) : currentMes}));
-  const todasParcCartao = Object.values(DB.gastosCartao||{}).flat()
-    .filter(g=>g.parcTotal>1)
-    .map(g=>({...g, _chaveMes: g.data ? g.data.slice(0,7) : currentMes}));
-
-  const vistosParcKpi = new Set();
-  const parcUnicas = [...todasParcConta, ...todasParcCartao].filter(p=>{
-    const chave = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`;
-    if(vistosParcKpi.has(chave)) return false;
-    vistosParcKpi.add(chave); return true;
-  });
-
-  const totalRestanteKpi = parcUnicas.reduce((s,p)=>{
-    // Descobrir em que mês essa parcela (parcAtual) foi registrada
-    const [py, pm] = p._chaveMes.split('-').map(Number);
-    const mesRegistro = py*12 + pm;
-    // Quantos meses passaram desde o registro até o mês atual exibido
-    const mesesPassados = Math.max(0, mesAtualNum - mesRegistro);
-    // Parcela atual "corrigida pelo tempo"
-    const parcAtualCorrigida = p.parcAtual + mesesPassados;
-    // Parcelas restantes a partir de hoje
-    const restantes = Math.max(0, p.parcTotal - parcAtualCorrigida + 1);
-    return s + restantes * p.valor;
-  }, 0);
+  // KPI parcelas — com o novo modelo cada parcela está no seu mês correto,
+  // então basta somar os itens parcelados do mês atual em diante.
+  // Conta corrente: usa mesmas heurísticas de antes (registradas com data)
+  // Cartão: soma entradas de gastosCartao[mes >= currentMes] com parcTotal > 1
+  const totalRestanteKpi = (() => {
+    let total = 0;
+    // Parcelas de conta corrente (heurística temporal)
+    const mesAtualNum = (()=>{ const [y,m]=currentMes.split('-').map(Number); return y*12+m; })();
+    const vistos = new Set();
+    Object.values(DB.lancamentos||{}).flat()
+      .filter(l=>l.parcTotal>1 && l.tipo==='desp')
+      .forEach(p=>{
+        const chave = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`;
+        if(vistos.has(chave)) return; vistos.add(chave);
+        const [py,pm] = (p.data||currentMes).slice(0,7).split('-').map(Number);
+        const mesesPassados = Math.max(0, mesAtualNum-(py*12+pm));
+        const parcCorrigida = p.parcAtual + mesesPassados;
+        total += Math.max(0, p.parcTotal - parcCorrigida + 1) * p.valor;
+      });
+    // Parcelas de cartão — modelo novo: cada parcela já está no mês certo
+    Object.entries(DB.gastosCartao||{}).forEach(([mes, gastos])=>{
+      if(mes >= currentMes){
+        gastos.filter(g=>g.parcTotal>1).forEach(g=>{ total += g.valor; });
+      }
+    });
+    return total;
+  })();
   const cats = DB.categorias.filter(c=>c.tipo==='desp'||c.tipo==='both');
   const topCat = (() => {
     const map={};
@@ -1851,7 +1867,7 @@ function removerOrcamento(){
 }
 
 // ── PAINEL DE DÍVIDAS E PARCELAS ──────────────────────────────────────────────
-// Calcula qual parcela está vigente hoje (currentMes) dado o mês em que foi registrada
+// Calcula qual parcela está vigente hoje — para dados legados (modelo antigo)
 function _parcAtualHoje(parcAtualOriginal, mesSalvo){
   if(!mesSalvo) return parcAtualOriginal;
   const [sy,sm] = mesSalvo.split('-').map(Number);
@@ -1861,49 +1877,58 @@ function _parcAtualHoje(parcAtualOriginal, mesSalvo){
 }
 
 function _getParcelas(){
-  // Para cada item precisamos saber em qual chave do DB ele está salvo (para exclusão correta)
-  // e qual a data da compra (para correção temporal). São coisas diferentes!
+  // ── Modelo NOVO: cartão ───────────────────────────────────────────────────
+  // Cada parcela já está no mês certo. Agrupamos para exibição no painel.
+  const gruposCartao = {};
+  Object.entries(DB.gastosCartao||{}).forEach(([chaveMes, gastos])=>{
+    gastos.filter(g=>g.parcTotal>1).forEach(g=>{
+      const chave = `${g.desc}|${Number(g.valor).toFixed(2)}|${g.parcTotal}`;
+      if(!gruposCartao[chave]){
+        gruposCartao[chave] = { rep: null, ids: [], mesMin: chaveMes };
+      }
+      gruposCartao[chave].ids.push({ id: g.id, mes: chaveMes, origem: 'cartao' });
+      // Representante = parcela com menor número (início do parcelamento)
+      if(!gruposCartao[chave].rep || g.parcAtual < gruposCartao[chave].rep.parcAtual){
+        gruposCartao[chave].rep = g;
+        gruposCartao[chave].mesMin = chaveMes;
+      }
+    });
+  });
+
+  const resultadosCartao = Object.values(gruposCartao).map(g=>({
+    ...g,
+    // parcAtualHoje = parcela do mês atual exibido
+    parcAtualHoje: (() => {
+      const entry = g.ids
+        .map(({id, mes})=>({ id, mes, parc: (DB.gastosCartao[mes]||[]).find(x=>x.id===id)?.parcAtual }))
+        .find(x => x.mes === currentMes);
+      return entry?.parc || g.rep.parcAtual;
+    })()
+  })).filter(g=> currentMes <= Object.keys(DB.gastosCartao||{})
+    .filter(m=> (DB.gastosCartao[m]||[]).some(x=>
+      x.desc===g.rep.desc && Math.abs(x.valor-g.rep.valor)<0.01 && x.parcTotal===g.rep.parcTotal
+    )).sort().reverse()[0] || currentMes
+  );
+
+  // ── Modelo LEGADO: conta corrente ─────────────────────────────────────────
   const parcConta = [];
   Object.entries(DB.lancamentos||{}).forEach(([chaveMes, lancs])=>{
     lancs.filter(l=>l.parcTotal>1 && l.tipo==='desp').forEach(l=>{
-      parcConta.push({
-        ...l, origem:'conta',
-        _chaveMesDB: chaveMes,           // onde está salvo no DB (para deletar)
-        _mesSalvo: l.data ? l.data.slice(0,7) : chaveMes  // data real da compra (para correção temporal)
-      });
+      parcConta.push({...l, origem:'conta', _chaveMesDB: chaveMes, _mesSalvo: l.data?l.data.slice(0,7):chaveMes});
     });
   });
-
-  const parcCartao = [];
-  Object.entries(DB.gastosCartao||{}).forEach(([chaveMes, gastos])=>{
-    gastos.filter(g=>g.parcTotal>1).forEach(g=>{
-      parcCartao.push({
-        ...g, origem:'cartao',
-        _chaveMesDB: chaveMes,           // onde está salvo no DB (para deletar)
-        _mesSalvo: g.data ? g.data.slice(0,7) : chaveMes  // data real da compra (para correção temporal)
-      });
-    });
-  });
-
-  const grupos = {};
-  [...parcConta, ...parcCartao].forEach(p=>{
+  const gruposConta = {};
+  parcConta.forEach(p=>{
     const chave = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`;
-    if(!grupos[chave]){
-      grupos[chave] = {rep: p, ids: [], _mesSalvoMin: p._mesSalvo};
-    }
-    // ids usa _chaveMesDB para garantir que a exclusão aconteça no lugar certo
-    grupos[chave].ids.push({id: p.id, mes: p._chaveMesDB, origem: p.origem});
-    // Representante mais antigo pela data real da compra
-    if(p._mesSalvo < grupos[chave]._mesSalvoMin){
-      grupos[chave]._mesSalvoMin = p._mesSalvo;
-      grupos[chave].rep = p;
-    }
+    if(!gruposConta[chave]) gruposConta[chave] = { rep: p, ids: [], _mesSalvoMin: p._mesSalvo };
+    gruposConta[chave].ids.push({ id: p.id, mes: p._chaveMesDB, origem: 'conta' });
+    if(p._mesSalvo < gruposConta[chave]._mesSalvoMin){ gruposConta[chave]._mesSalvoMin = p._mesSalvo; gruposConta[chave].rep = p; }
   });
-
-  return Object.values(grupos).map(g=>({
-    ...g,
-    parcAtualHoje: _parcAtualHoje(g.rep.parcAtual, g._mesSalvoMin)
+  const resultadosConta = Object.values(gruposConta).map(g=>({
+    ...g, parcAtualHoje: _parcAtualHoje(g.rep.parcAtual, g._mesSalvoMin)
   })).filter(g=> g.parcAtualHoje <= g.rep.parcTotal);
+
+  return [...resultadosCartao, ...resultadosConta];
 }
 
 function excluirParcela(chave, modalPaiEl){
@@ -1955,55 +1980,93 @@ function excluirParcela(chave, modalPaiEl){
 }
 
 function abrirPainelDividas(){
-  const grupos = _getParcelas();
+  // Modelo NOVO (cartão): cada parcela já está no seu mês.
+  // Agrupamos por parcelamento para exibição no painel.
+  const gruposCartao = {};
+  Object.entries(DB.gastosCartao||{}).forEach(([chaveMes, gastos])=>{
+    gastos.filter(g=>g.parcTotal>1).forEach(g=>{
+      const chave = `${g.desc}|${Number(g.valor).toFixed(2)}|${g.parcTotal}`;
+      if(!gruposCartao[chave]) gruposCartao[chave] = { rep: g, _mesRep: chaveMes, idsAll: [], restante: 0 };
+      gruposCartao[chave].idsAll.push({ id: g.id, mes: chaveMes });
+      gruposCartao[chave].restante += chaveMes >= currentMes ? g.valor : 0;
+      // Representante = entrada mais próxima do mês atual (ou futura mais antiga)
+      if(chaveMes >= currentMes && (!gruposCartao[chave]._mesAtual || chaveMes < gruposCartao[chave]._mesAtual)){
+        gruposCartao[chave]._mesAtual = chaveMes;
+        gruposCartao[chave].rep = g;
+      }
+    });
+  });
+  // Filtrar parcelamentos que ainda têm entradas no presente ou futuro
+  const gruposCartaoArr = Object.values(gruposCartao).filter(g=>g.restante > 0);
 
-  let totalRestante = 0;
-  grupos.forEach(g=>{
-    const restantes = Math.max(0, g.rep.parcTotal - g.parcAtualHoje + 1);
+  // Modelo LEGADO (conta corrente)
+  const gruposConta = _getParcelas().filter(g=>g.rep?.origem==='conta');
+
+  let totalRestante = gruposCartaoArr.reduce((s,g)=>s+g.restante,0);
+  gruposConta.forEach(g=>{
+    const restantes = Math.max(0, g.rep.parcTotal - (g.parcAtualHoje||g.rep.parcAtual) + 1);
     totalRestante += restantes * g.rep.valor;
   });
 
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9000;display:flex;align-items:flex-end;justify-content:center';
 
-  const listaHtml = grupos.length ? grupos
-    .sort((a,b)=>{
-      const ra = Math.max(0, a.rep.parcTotal - a.parcAtualHoje + 1);
-      const rb = Math.max(0, b.rep.parcTotal - b.parcAtualHoje + 1);
-      return rb - ra;
-    })
-    .map(({rep: p, ids, parcAtualHoje})=>{
-      const cat = DB.categorias.find(c=>c.id===p.catId) || {icone:'💸',nome:'Outros'};
-      const restantes = Math.max(0, p.parcTotal - parcAtualHoje + 1);
-      const faltaPagar = restantes * p.valor;
-      const pctPago = Math.min(100, Math.round((parcAtualHoje - 1) / p.parcTotal * 100));
-      const chave = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`.replace(/'/g,"\'");
-      const origemLabel = ids[0].origem === 'conta' ? '💰 Conta' : '💳 Cartão';
-      return `<div style="background:var(--s2);border-radius:14px;padding:14px;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <div style="font-size:20px">${cat.icone}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.desc}</div>
-            <div style="font-size:11px;color:var(--mu)">${origemLabel} · parcela ${parcAtualHoje} de ${p.parcTotal}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="text-align:right">
-              <div style="font-size:13px;font-weight:700;color:var(--am)">${fmtV(p.valor)}</div>
-              <div style="font-size:10px;color:var(--mu)">por mês</div>
-            </div>
-            <button onclick="excluirParcela('${chave}', this.closest('div[style*=fixed]'))" title="Excluir" style="background:rgba(255,122,122,.1);border:1px solid rgba(255,122,122,.25);border-radius:8px;padding:6px 8px;color:var(--rd);font-size:14px;cursor:pointer;line-height:1">🗑</button>
-          </div>
+  const htmlCartao = gruposCartaoArr.map(g=>{
+    const cat = DB.categorias.find(c=>c.id===g.rep.catId)||{icone:'💸'};
+    const pctPago = Math.min(100, Math.round((g.rep.parcAtual-1)/g.rep.parcTotal*100));
+    const qtdFutura = g.idsAll.filter(x=>x.mes>=currentMes).length;
+    const chaveEsc = `${g.rep.desc}|${Number(g.rep.valor).toFixed(2)}|${g.rep.parcTotal}`.replace(/'/g,"\'");
+    return `<div style="background:var(--s2);border-radius:14px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="font-size:20px">${cat.icone}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.rep.desc}</div>
+          <div style="font-size:11px;color:var(--mu)">💳 Cartão · parcela ${g.rep.parcAtual} de ${g.rep.parcTotal}</div>
         </div>
-        <div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:6px">
-          <div style="height:100%;width:${pctPago}%;background:var(--gr);transition:width .4s"></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="text-align:right"><div style="font-size:13px;font-weight:700;color:var(--am)">${fmtV(g.rep.valor)}</div><div style="font-size:10px;color:var(--mu)">por mês</div></div>
+          <button onclick="excluirParcelaCartaoNovo('${chaveEsc}',this.closest('div[style*=fixed]'))" style="background:rgba(255,122,122,.1);border:1px solid rgba(255,122,122,.25);border-radius:8px;padding:6px 8px;color:var(--rd);font-size:14px;cursor:pointer;line-height:1">🗑</button>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px">
-          <span style="color:var(--gr)">${pctPago}% pago</span>
-          <span style="color:var(--ts)">Falta <strong>${fmtV(faltaPagar)}</strong> (${restantes}x)</span>
+      </div>
+      <div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:6px">
+        <div style="height:100%;width:${pctPago}%;background:var(--gr)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--gr)">${pctPago}% pago</span>
+        <span style="color:var(--ts)">Falta <strong>${fmtV(g.restante)}</strong> (${qtdFutura}x)</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const htmlConta = gruposConta.map(({rep:p, ids, parcAtualHoje})=>{
+    const cat = DB.categorias.find(c=>c.id===p.catId)||{icone:'💸'};
+    const restantes = Math.max(0, p.parcTotal - parcAtualHoje + 1);
+    const pctPago = Math.min(100, Math.round((parcAtualHoje-1)/p.parcTotal*100));
+    const chaveEsc = `${p.desc}|${Number(p.valor).toFixed(2)}|${p.parcTotal}`.replace(/'/g,"\'");
+    return `<div style="background:var(--s2);border-radius:14px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="font-size:20px">${cat.icone}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.desc}</div>
+          <div style="font-size:11px;color:var(--mu)">💰 Conta · parcela ${parcAtualHoje} de ${p.parcTotal}</div>
         </div>
-      </div>`;
-    }).join('')
-    : '<div style="text-align:center;padding:30px 0;color:var(--mu)"><div style="font-size:32px;margin-bottom:8px">🎉</div><div style="font-size:13px">Você não tem nenhuma parcela em andamento!</div></div>';
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="text-align:right"><div style="font-size:13px;font-weight:700;color:var(--am)">${fmtV(p.valor)}</div><div style="font-size:10px;color:var(--mu)">por mês</div></div>
+          <button onclick="excluirParcela('${chaveEsc}',this.closest('div[style*=fixed]'))" style="background:rgba(255,122,122,.1);border:1px solid rgba(255,122,122,.25);border-radius:8px;padding:6px 8px;color:var(--rd);font-size:14px;cursor:pointer;line-height:1">🗑</button>
+        </div>
+      </div>
+      <div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:6px">
+        <div style="height:100%;width:${pctPago}%;background:var(--gr)"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--gr)">${pctPago}% pago</span>
+        <span style="color:var(--ts)">Falta <strong>${fmtV(restantes*p.valor)}</strong> (${restantes}x)</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const listaHtml = htmlCartao + htmlConta || '<div style="text-align:center;padding:30px 0;color:var(--mu)"><div style="font-size:32px;margin-bottom:8px">🎉</div><div style="font-size:13px">Nenhuma parcela em andamento!</div></div>';
+  const totalGrupos = gruposCartaoArr.length + gruposConta.length;
 
   modal.innerHTML = `
     <div style="background:var(--s1);border-radius:24px 24px 0 0;padding:24px 20px calc(28px + var(--safe-b));width:100%;max-width:480px;max-height:85vh;overflow-y:auto;border-top:1px solid var(--bd)">
@@ -2013,18 +2076,52 @@ function abrirPainelDividas(){
         <span style="font-size:17px;font-weight:700;color:var(--tx);flex:1">Minhas parcelas</span>
         <button onclick="abrirFormNovaParcela(this.closest('div[style*=fixed]'))" style="padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--gr),var(--gr2));color:#06281d;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">+ Adicionar</button>
       </div>
-      ${grupos.length ? `
+      ${totalGrupos ? `
       <div style="background:linear-gradient(135deg,rgba(255,194,75,.12),rgba(255,122,122,.06));border:1px solid rgba(255,194,75,.25);border-radius:16px;padding:16px;margin:14px 0 18px">
         <div style="font-size:12px;color:var(--ts);margin-bottom:4px">Ainda falta pagar no total</div>
         <div style="font-size:26px;font-weight:800;color:var(--am)">${fmtV(totalRestante)}</div>
-        <div style="font-size:11px;color:var(--mu);margin-top:4px">${grupos.length} parcelamento(s) em andamento</div>
+        <div style="font-size:11px;color:var(--mu);margin-top:4px">${totalGrupos} parcelamento(s) em andamento</div>
       </div>` : ''}
-      <div id="_painel-lista">${listaHtml}</div>
+      ${listaHtml}
       <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;margin-top:8px;padding:13px;border-radius:14px;border:none;background:var(--s2);color:var(--tx);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Fechar</button>
     </div>`;
   modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
   document.body.appendChild(modal);
 }
+
+function excluirParcelaCartaoNovo(chave, modalEl){
+  const parts = chave.split('|');
+  const desc = parts.slice(0,-2).join('|');
+  const valor = parseFloat(parts[parts.length-2]);
+  const parcTotal = parseInt(parts[parts.length-1]);
+  const conf = document.createElement('div');
+  conf.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  conf.innerHTML = `<div style="background:var(--s1);border:1px solid var(--bd);border-radius:20px;padding:24px;max-width:320px;width:100%;text-align:center">
+    <div style="font-size:28px;margin-bottom:10px">🗑</div>
+    <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:8px">Excluir parcelamento?</div>
+    <div style="font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.5"><strong style="color:var(--ts)">${desc}</strong><br>Todas as parcelas (passadas e futuras) serão removidas.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button id="_cps" style="padding:13px;border-radius:12px;border:none;background:var(--rd);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">Sim, excluir tudo</button>
+      <button id="_cpn" style="padding:12px;border-radius:12px;border:1.5px solid var(--bd);background:transparent;color:var(--mu);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Cancelar</button>
+    </div></div>`;
+  document.body.appendChild(conf);
+  conf.querySelector('#_cpn').onclick = ()=>conf.remove();
+  conf.onclick = e=>{ if(e.target===conf) conf.remove(); };
+  conf.querySelector('#_cps').onclick = ()=>{
+    conf.remove();
+    Object.keys(DB.gastosCartao||{}).forEach(mes=>{
+      DB.gastosCartao[mes] = (DB.gastosCartao[mes]||[]).filter(g=>
+        !(g.desc===desc && Math.abs(g.valor-valor)<0.01 && g.parcTotal===parcTotal)
+      );
+    });
+    dbSave();
+    showToast('Parcelamento excluído ✓');
+    if(modalEl) modalEl.remove();
+    renderInicio();
+    abrirPainelDividas();
+  };
+}
+
 
 // ── SELEÇÃO MÚLTIPLA — LANÇAMENTOS ───────────────────────────────────────────
 let _selModoLanc = false;
@@ -2224,20 +2321,29 @@ function editLanc(id){
 }
 
 function selLancTipo(tipo){
-  lancTipo=tipo;
-  document.getElementById('lanc-tipo-desp').classList.toggle('active',tipo==='desp');
-  document.getElementById('lanc-tipo-rec').classList.toggle('active',tipo==='rec');
+  lancTipo = tipo;
+  document.getElementById('lanc-tipo-desp').classList.toggle('active', tipo==='desp');
+  document.getElementById('lanc-tipo-rec').classList.toggle('active',  tipo==='rec');
+  document.getElementById('lanc-tipo-invest')?.classList.toggle('active', tipo==='invest');
+  // Investimento: tratar como saída para categorias (sai da conta)
   renderLancCats();
 }
 
 function renderLancCats(){
-  const sel=document.getElementById('lanc-cat');
-  sel.innerHTML='';
-  DB.categorias.filter(c=>c.tipo===lancTipo||c.tipo==='both').forEach(c=>{
-    const o=document.createElement('option');
-    o.value=c.id; o.textContent=c.icone+' '+c.nome;
+  const sel = document.getElementById('lanc-cat');
+  sel.innerHTML = '';
+  // Investimentos têm categoria própria; demais filtram por tipo
+  const tipoFiltro = lancTipo === 'invest' ? 'desp' : lancTipo;
+  DB.categorias.filter(c => c.tipo === tipoFiltro || c.tipo === 'both').forEach(c=>{
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.icone+' '+c.nome;
     sel.appendChild(o);
   });
+  // Se for investimento, pré-selecionar a categoria "Investimento" se existir
+  if(lancTipo === 'invest'){
+    const catInvest = DB.categorias.find(c=>/investimento/i.test(c.nome));
+    if(catInvest) sel.value = catInvest.id;
+  }
 }
 
 function toggleParc(btn){
@@ -2270,13 +2376,21 @@ function salvarLanc(){
   };
   if(!DB.lancamentos[mesDaData]) DB.lancamentos[mesDaData]=[];
   if(editLancId){
-    // Ao editar, remover do mês antigo e inserir no mês da nova data
+    // Ao editar: estornar efeito do lançamento antigo no saldo de investimento
+    const antigo = Object.values(DB.lancamentos).flat().find(l=>l.id===editLancId);
+    if(antigo && antigo.tipo==='invest'){
+      DB.saldoInvestimento = Math.max(0, (DB.saldoInvestimento||0) - antigo.valor);
+    }
     Object.keys(DB.lancamentos).forEach(m=>{
       DB.lancamentos[m] = DB.lancamentos[m].filter(l=>l.id!==editLancId);
     });
     DB.lancamentos[mesDaData].push(lanc);
   } else {
     DB.lancamentos[mesDaData].push(lanc);
+  }
+  // Atualizar saldo de investimento
+  if(lancTipo === 'invest'){
+    DB.saldoInvestimento = (DB.saldoInvestimento||0) + valor;
   }
   dbSave(); closeAllDrawers();
   showToast(editLancId?'Lançamento atualizado ✓':'Lançamento salvo ✓');
@@ -2311,12 +2425,17 @@ function deleteLanc(id){
 }
 
 function confirmarDeleteLanc(id){
-  // Procurar em todos os meses (pode ser editado em mês diferente)
   let found = false;
   Object.keys(DB.lancamentos).forEach(ym=>{
-    const antes = DB.lancamentos[ym].length;
+    const lanc = DB.lancamentos[ym].find(l=>l.id===id);
+    if(lanc){
+      // Estornar do saldo de investimento se necessário
+      if(lanc.tipo === 'invest'){
+        DB.saldoInvestimento = Math.max(0, (DB.saldoInvestimento||0) - lanc.valor);
+      }
+      found = true;
+    }
     DB.lancamentos[ym] = DB.lancamentos[ym].filter(l=>l.id!==id);
-    if(DB.lancamentos[ym].length < antes) found = true;
   });
   if(found){
     dbSave();
@@ -2551,6 +2670,7 @@ function confirmarImportBackup(){
   DB.cartoes        = dados.cartoes        || DB.cartoes;
   DB.saldoConta     = dados.saldoConta     ?? null;
   DB.saldoContaData = dados.saldoContaData ?? null;
+  DB.saldoInvestimento = dados.saldoInvestimento ?? 0;
   dbSave();
   window._backupPendente = null;
   showToast('Backup restaurado com sucesso ✓');
@@ -5032,31 +5152,80 @@ function copiarLink(){
 </body>
 </html>
 <script>
-// lancHTML — renderiza item de lançamento com suporte a modo seleção
+// ── MODAL DE INVESTIMENTO ─────────────────────────────────────────────────────
+function abrirModalInvestimento(){
+  const atual = DB.saldoInvestimento || 0;
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--s1);border-radius:24px 24px 0 0;padding:24px 20px calc(28px + var(--safe-b));width:100%;max-width:480px;border-top:1px solid var(--bd)">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 18px"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-size:24px">💎</span>
+        <span style="font-size:17px;font-weight:700;color:var(--tx)">Meus investimentos</span>
+      </div>
+      <div style="font-size:13px;color:var(--mu);margin-bottom:18px;line-height:1.5">
+        Saldo acumulado de todos os lançamentos do tipo <strong style="color:var(--am)">💎 Investimento</strong>.<br>
+        Você pode ajustar manualmente se precisar corrigir o valor.
+      </div>
+      <div style="background:var(--s2);border-radius:14px;padding:16px;margin-bottom:18px;text-align:center">
+        <div style="font-size:12px;color:var(--mu);margin-bottom:4px">Saldo atual</div>
+        <div style="font-size:28px;font-weight:800;color:var(--am)">${fmtV(atual)}</div>
+      </div>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Ajustar saldo manualmente</div>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--s2);border:1.5px solid var(--bd);border-radius:14px;padding:12px 14px;margin-bottom:16px">
+        <span style="color:var(--mu);font-size:14px">R$</span>
+        <input id="input-invest" type="number" inputmode="decimal" value="${atual.toFixed(2)}" style="flex:1;background:transparent;border:none;outline:none;color:var(--tx);font-size:20px;font-weight:700;font-family:inherit">
+      </div>
+      <button onclick="salvarSaldoInvestimento()" style="width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--am),#e6a800);color:#1a0f00;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:8px">Salvar</button>
+      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:12px;border-radius:14px;border:none;background:transparent;color:var(--mu);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Cancelar</button>
+    </div>`;
+  modal.onclick = e=>{ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
+  setTimeout(()=>document.getElementById('input-invest')?.focus(),200);
+}
+
+function salvarSaldoInvestimento(){
+  const val = parseFloat(document.getElementById('input-invest').value);
+  if(isNaN(val) || val < 0){ showToast('Digite um valor válido'); return; }
+  DB.saldoInvestimento = val;
+  dbSave();
+  document.querySelector('div[style*="z-index:9000"]')?.remove();
+  showToast('Saldo de investimento atualizado ✓');
+  renderInicio();
+}
+
+
 function lancHTML(l){
   const cat = DB.categorias.find(c=>c.id===l.catId)||{icone:'💸',nome:'Outros',cor:'#64748b'};
   const dataFmt = l.data ? new Date(l.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
   const parcInfo = l.parcTotal>1 ? ` · ${l.parcAtual}/${l.parcTotal}` : '';
+  const isInvest = l.tipo === 'invest';
+  const icone    = isInvest ? '💎' : cat.icone;
+  const bg       = isInvest ? 'rgba(255,194,75,.15)' : `${cat.cor}22`;
+  const valCor   = isInvest ? 'var(--am)' : (l.tipo==='rec' ? 'var(--gr)' : 'var(--rd)');
+  const valLabel = l.tipo==='rec' ? `+${fmtV(l.valor)}` : (isInvest ? `💎 ${fmtV(l.valor)}` : `-${fmtV(l.valor)}`);
+  const catNome  = isInvest ? '💎 Investimento' : cat.nome;
   const sel = _selIdsLanc.has(l.id);
 
   if(_selModoLanc){
     return `<div class="lanc-item${sel?' selecionado':''}" data-sel-id="${l.id}" onclick="_toggleLancSel('${l.id}')">
       <div class="lanc-check">${sel?'✓':''}</div>
-      <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
+      <div class="lanc-ico" style="background:${bg}">${icone}</div>
       <div class="lanc-info">
         <div class="lanc-desc">${l.desc}</div>
-        <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt}</div>
+        <div class="lanc-cat">${catNome}${parcInfo} · ${dataFmt}</div>
       </div>
-      <div class="lanc-val ${l.tipo}">${l.tipo==='rec'?'+':'-'}${fmtV(l.valor)}</div>
+      <div class="lanc-val" style="color:${valCor}">${valLabel}</div>
     </div>`;
   }
   return `<div class="lanc-item" onclick="editLanc('${l.id}')">
-    <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
+    <div class="lanc-ico" style="background:${bg}">${icone}</div>
     <div class="lanc-info">
       <div class="lanc-desc">${l.desc}</div>
-      <div class="lanc-cat">${cat.nome}${parcInfo} · ${dataFmt}</div>
+      <div class="lanc-cat">${catNome}${parcInfo} · ${dataFmt}</div>
     </div>
-    <div class="lanc-val ${l.tipo}">${l.tipo==='rec'?'+':'-'}${fmtV(l.valor)}</div>
+    <div class="lanc-val" style="color:${valCor}">${valLabel}</div>
   </div>`;
 }
 
@@ -6091,62 +6260,72 @@ async function rodarParserFaturaIA(){
     // ── PASSO 2: Extrair lançamentos em blocos pequenos (prompt enxuto) ───────────
     // Sem portador no prompt → resposta JSON menor → menos tokens → menos timeout.
     // Portador é atribuído pelo offset após retorno da IA.
-    const TAMANHO_BLOCO = 2000;
+    // Blocos de 1500 chars — menores que antes para respostas mais rápidas
+    const TAMANHO_BLOCO = 1500;
     const blocos = [];
     for(let i=0; i<txt.length; i+=TAMANHO_BLOCO){
       blocos.push({ texto: txt.slice(i, i+TAMANHO_BLOCO), offsetInicio: i });
     }
 
+    // Sistema de prompt compacto — menos tokens = resposta mais rápida
+    const sistemaMsg = 'Extrai lançamentos de faturas de cartão. JSON apenas, sem markdown.';
+    const makePrompt = (bloco, idx) => `Fatura cartão (parte ${idx+1}/${blocos.length}). Categorias: ${cats}
+
+TEXTO:
+${bloco.texto}
+
+JSON: {"itens":[{"d":"DD/MM","n":"nome","v":0.00,"c":"Categoria","pa":1,"pt":1}]}
+Campos: d=data, n=descrição, v=valor, c=categoria, pa=parcela atual, pt=parcela total.
+Ignore: totais, juros, IOF, cabeçalhos, negativos, anuidade com estorno. Inclua internacionais em R$.`;
+
+    // Processar em paralelo — lotes de 4 blocos simultâneos
+    // Sequencial com 10 blocos × 5s = 50s. Paralelo (4 por vez) = ~15s.
+    const LOTE = 4;
     let todosItens = [];
     let blocosComErro = 0;
-    for(let i=0; i<blocos.length; i++){
-      statusEl.textContent = `✨ Analisando parte ${i+1} de ${blocos.length}...`;
 
-      const prompt = `Extraia lançamentos de compra desta parte de fatura de cartão de crédito brasileira.
+    for(let loteInicio=0; loteInicio<blocos.length; loteInicio+=LOTE){
+      const lote = blocos.slice(loteInicio, loteInicio+LOTE);
+      const numLote = Math.floor(loteInicio/LOTE)+1;
+      const totalLotes = Math.ceil(blocos.length/LOTE);
+      statusEl.textContent = `✨ Analisando lote ${numLote}/${totalLotes} (${lote.length} partes em paralelo)...`;
 
-CATEGORIAS: ${cats}
-
-TEXTO (parte ${i+1}/${blocos.length}):
-${blocos[i].texto}
-
-Retorne APENAS JSON: {"itens":[{"data":"DD/MM","desc":"estabelecimento","valor":99.90,"categoria":"NomeCategoria","parcAtual":1,"parcTotal":1}]}
-
-REGRAS:
-- Ignore totais, juros, encargos, IOF, limites e cabeçalhos
-- Ignore anuidades com estorno correspondente
-- Ignore valores negativos
-- Parcelamentos: detecte "01/03" no final
-- Internacionais em R$: inclua normalmente
-- Desconhecido: use "Outros gastos"
-- Ignore linhas sem data+valor claros`;
-
-      // Retry automático — se a chamada falhar (ex: timeout da função serverless),
-      // tenta de novo até 2 vezes antes de desistir desse bloco.
-      let sucesso = false;
-      for(let tentativa=1; tentativa<=3 && !sucesso; tentativa++){
-        try {
-          if(tentativa > 1) statusEl.textContent = `✨ Parte ${i+1}/${blocos.length} (tentativa ${tentativa})...`;
-          const resposta = await chamarIA(prompt, 'Você extrai lançamentos de faturas de cartão de crédito brasileiras de qualquer banco. Retorne apenas JSON válido, sem markdown.', 2000);
-          const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-          let dados;
-          try { dados = JSON.parse(json); }
-          catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
-          const itensBloco = (dados.itens || []).map(it=>({
-            ...it,
-            // Portador determinado pela posição do bloco no texto original
-            portador: portadorDoOffset(blocos[i].offsetInicio)
-          }));
-          todosItens = todosItens.concat(itensBloco);
-          console.log(`Bloco ${i+1}/${blocos.length} (tentativa ${tentativa}): ${itensBloco.length} itens, portador=${portadorDoOffset(blocos[i].offsetInicio)}, soma R$ ${itensBloco.reduce((s,it)=>s+(it.valor||0),0).toFixed(2)}`);
-          sucesso = true;
-        } catch(errBloco){
-          console.warn(`Erro no bloco ${i+1} (tentativa ${tentativa}):`, errBloco.message);
-          if(tentativa === 3){
-            blocosComErro++;
-            statusEl.textContent = `⚠️ Parte ${i+1} falhou após 3 tentativas, continuando...`;
+      // Processar todos os blocos do lote simultaneamente
+      const resultados = await Promise.allSettled(
+        lote.map(async (bloco, idx) => {
+          const prompt = makePrompt(bloco, loteInicio+idx);
+          // Retry por bloco individual (até 2 tentativas)
+          for(let t=1; t<=2; t++){
+            try {
+              const resposta = await chamarIA(prompt, sistemaMsg, 1200);
+              const json = resposta.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+              let dados;
+              try { dados = JSON.parse(json); }
+              catch { const m = json.match(/\{[\s\S]*\}/); dados = m ? JSON.parse(m[0]) : {itens:[]}; }
+              const itens = (dados.itens || []).map(it=>({
+                data: it.d, desc: it.n, valor: it.v,
+                categoria: it.c, parcAtual: it.pa||1, parcTotal: it.pt||1,
+                portador: portadorDoOffset(bloco.offsetInicio)
+              }));
+              console.log(`Bloco ${loteInicio+idx+1}: ${itens.length} itens, R$${itens.reduce((s,x)=>s+(x.valor||0),0).toFixed(2)}`);
+              return itens;
+            } catch(e){
+              if(t===2) throw e;
+              await new Promise(r=>setTimeout(r,1000));
+            }
           }
+        })
+      );
+
+      // Coletar resultados, registrar falhas
+      resultados.forEach((res, idx) => {
+        if(res.status === 'fulfilled' && res.value){
+          todosItens = todosItens.concat(res.value);
+        } else {
+          blocosComErro++;
+          console.warn(`Bloco ${loteInicio+idx+1} falhou:`, res.reason?.message);
         }
-      }
+      });
     }
 
     if(blocosComErro === blocos.length){
@@ -6233,32 +6412,84 @@ function abrirRevisaoFatura(){
   document.getElementById('cartao-step-import').style.display = 'none';
   document.getElementById('cartao-step-revisao').style.display = '';
 
-  const cartao = DB.cartoes.find(c=>c.id===cartaoImpSelId);
-  const totalFatura = parsedItemsFatura.reduce((s,it)=>s+it.valor,0);
-  document.getElementById('cartaoRevSub').innerHTML = `${parsedItemsFatura.length} itens · ${cartao?.nome||''} · <strong style="color:var(--rd)">${fmtV(totalFatura)}</strong>
-    <button onclick="copiarDebugFatura()" style="margin-left:8px;font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);background:var(--s2);color:var(--mu);cursor:pointer">📋 Copiar lista p/ debug</button>`;
+  // ── DETECTAR DUPLICATAS ──────────────────────────────────────────────────────
+  // Verifica se algum item da fatura já existe no gastosCartao pelo cartão
+  // selecionado, com mesma data E mesmo valor. Detecta quando o usuário lançou
+  // manualmente e depois importou a fatura com os mesmos itens.
+  const todosGastosExistentes = Object.values(DB.gastosCartao||{}).flat()
+    .filter(g => g.cartaoId === cartaoImpSelId);
 
-  const cats = DB.categorias.filter(c=>c.tipo==='desp');
-  document.getElementById('cartaoRevList').innerHTML = '<div class="card" style="padding:4px 16px">' + parsedItemsFatura.map((it,i)=>{
-    const cat = DB.categorias.find(c=>c.id===it.catId) || {icone:'💸',nome:'Outros',cor:'#64748b'};
-    const parcInfo = it.parcTotal>1 ? ` · ${it.parcAtual}/${it.parcTotal}` : '';
-    return `<div class="lanc-item">
-      <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
-      <div class="lanc-info">
-        <div class="lanc-desc">${it.desc}</div>
-        <div class="lanc-cat">
-          <select data-idx="${i}" class="_rev-cat-select" style="background:none;border:none;color:var(--mu);font-size:11px;font-family:inherit">
-            ${cats.map(c=>`<option value="${c.id}" ${c.id===it.catId?'selected':''}>${c.icone} ${c.nome}</option>`).join('')}
-          </select>${parcInfo} · ${it.data}
-        </div>
-      </div>
-      <div class="lanc-val desp">-${fmtV(it.valor)}</div>
-    </div>`;
-  }).join('') + '</div>';
-
-  document.querySelectorAll('._rev-cat-select').forEach(sel=>{
-    sel.addEventListener('change', ()=>{ parsedItemsFatura[sel.dataset.idx].catId = sel.value; });
+  parsedItemsFatura.forEach(it => {
+    // Converter data do item para AAAA-MM-DD (mesmo formato do DB)
+    let dataISO = it.data || '';
+    if(it.data && it.data.includes('/')){
+      const [dd, mm] = it.data.split('/');
+      const mesFatura = mesAtualCartao();
+      const anoFatura = parseInt(mesFatura.slice(0,4));
+      const mesFatNum = parseInt(mesFatura.slice(5,7));
+      const mesLancNum = parseInt(mm);
+      const ano = mesLancNum > mesFatNum + 1 ? anoFatura - 1 : anoFatura;
+      dataISO = `${ano}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+    }
+    const duplicata = todosGastosExistentes.find(g =>
+      g.data === dataISO &&
+      Math.abs(g.valor - it.valor) < 0.01
+    );
+    it._duplicata = duplicata ? { desc: duplicata.desc, data: duplicata.data } : null;
+    if(duplicata) it._sel = false; // desmarca automaticamente
   });
+
+  const qtdDuplicatas = parsedItemsFatura.filter(it=>it._duplicata).length;
+  const cartao = DB.cartoes.find(c=>c.id===cartaoImpSelId);
+  const totalSelecionados = () => parsedItemsFatura.filter(it=>it._sel).reduce((s,it)=>s+it.valor,0);
+
+  function renderRevisaoLista(){
+    const cats = DB.categorias.filter(c=>c.tipo==='desp');
+    const total = totalSelecionados();
+    document.getElementById('cartaoRevSub').innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span>${parsedItemsFatura.filter(it=>it._sel).length} selecionados de ${parsedItemsFatura.length} · ${cartao?.nome||''} · <strong style="color:var(--rd)">${fmtV(total)}</strong></span>
+        <button onclick="copiarDebugFatura()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--bd);background:var(--s2);color:var(--mu);cursor:pointer">📋 Debug</button>
+      </div>
+      ${qtdDuplicatas ? `<div style="margin-top:6px;font-size:11px;background:rgba(255,194,75,.1);border:1px solid rgba(255,194,75,.3);border-radius:8px;padding:6px 10px;color:var(--am)">
+        ⚠️ ${qtdDuplicatas} item(ns) provavelmente já lançado(s) — desmarcados automaticamente. Revise abaixo.
+      </div>` : ''}`;
+
+    document.getElementById('cartaoRevList').innerHTML = '<div class="card" style="padding:4px 16px">'
+      + parsedItemsFatura.map((it,i)=>{
+        const cat = DB.categorias.find(c=>c.id===it.catId) || {icone:'💸',nome:'Outros',cor:'#64748b'};
+        const parcInfo = it.parcTotal>1 ? ` · ${it.parcAtual}/${it.parcTotal}` : '';
+        const isDup = !!it._duplicata;
+        const isSel = !!it._sel;
+
+        return `<div class="lanc-item" style="${isDup?'opacity:.65;':''}${!isSel?'background:rgba(255,122,122,.04);':''}">
+          <!-- Checkbox de inclusão -->
+          <div onclick="_toggleRevItem(${i})" style="flex-shrink:0;width:22px;height:22px;border-radius:6px;border:1.5px solid ${isSel?'var(--gr)':'var(--bd)'};background:${isSel?'var(--gr)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;color:#0f172a;font-size:13px;font-weight:700;margin-right:4px">${isSel?'✓':''}</div>
+          <div class="lanc-ico" style="background:${cat.cor}22">${cat.icone}</div>
+          <div class="lanc-info" style="flex:1;min-width:0">
+            <div class="lanc-desc" style="${!isSel?'text-decoration:line-through;color:var(--mu);':''}">${it.desc}</div>
+            <div class="lanc-cat">
+              <select data-idx="${i}" class="_rev-cat-select" style="background:none;border:none;color:var(--mu);font-size:11px;font-family:inherit;max-width:120px">
+                ${cats.map(c=>`<option value="${c.id}" ${c.id===it.catId?'selected':''}>${c.icone} ${c.nome}</option>`).join('')}
+              </select>${parcInfo} · ${it.data}
+            </div>
+            ${isDup ? `<div style="font-size:10px;color:var(--am);margin-top:2px">⚠️ Já existe: ${it._duplicata.desc} em ${it._duplicata.data}</div>` : ''}
+          </div>
+          <div class="lanc-val desp" style="${!isSel?'color:var(--mu);':''}">-${fmtV(it.valor)}</div>
+        </div>`;
+      }).join('') + '</div>';
+
+    document.querySelectorAll('._rev-cat-select').forEach(sel=>{
+      sel.onchange = ()=>{ parsedItemsFatura[sel.dataset.idx].catId = sel.value; };
+    });
+  }
+
+  window._toggleRevItem = (i) => {
+    parsedItemsFatura[i]._sel = !parsedItemsFatura[i]._sel;
+    renderRevisaoLista();
+  };
+
+  renderRevisaoLista();
 }
 
 function copiarDebugFatura(){
@@ -6278,40 +6509,102 @@ function copiarDebugFatura(){
 }
 
 function confirmarImportacaoFatura(){
-  const mes = mesAtualCartao();
-  if(!DB.gastosCartao[mes]) DB.gastosCartao[mes] = [];
+  const mesFatura = mesAtualCartao();
 
-  parsedItemsFatura.forEach(it=>{
-    // Converter data DD/MM para AAAA-MM-DD (para exibição)
-    // O ano é inferido: se o mês do lançamento for maior que o mês da fatura,
-    // assume ano anterior (parcelamento antigo).
+  // Helper: avança N meses a partir de AAAA-MM
+  function proximoMes(ym, n=1){
+    const [y,m] = ym.split('-').map(Number);
+    const d = new Date(y, m-1+n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }
+
+  // Helper: gera AAAA-MM-DD para o mês N a frente, mantendo o dia da compra
+  function dataFutura(dataISO, n){
+    const [ano, mm, dd] = dataISO.split('-').map(Number);
+    const d = new Date(ano, mm-1+n, 1);
+    // Dia da compra original, limitado ao último dia do novo mês
+    const diasNoMes = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    const diaFinal = Math.min(dd, diasNoMes);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(diaFinal).padStart(2,'0')}`;
+  }
+
+  // Importar apenas os itens marcados (_sel = true) na tela de revisão
+  const itensSelecionados = parsedItemsFatura.filter(it => it._sel !== false);
+  let totalCriados = 0;
+
+  itensSelecionados.forEach(it=>{
+    // ── Converter DD/MM → AAAA-MM-DD ─────────────────────────────────────────
     let dataISO = new Date().toISOString().slice(0,10);
     if(it.data && it.data.includes('/')){
       const [dd, mm] = it.data.split('/');
-      const anoFatura = parseInt(mes.slice(0,4));
-      const mesFatura = parseInt(mes.slice(5,7));
-      const mesLanc   = parseInt(mm);
-      const ano = mesLanc > mesFatura + 1 ? anoFatura - 1 : anoFatura;
+      const anoFatura  = parseInt(mesFatura.slice(0,4));
+      const mesFatNum  = parseInt(mesFatura.slice(5,7));
+      const mesLancNum = parseInt(mm);
+      // Se o mês da compra é bem posterior ao da fatura, provavelmente ano anterior
+      const ano = mesLancNum > mesFatNum + 1 ? anoFatura - 1 : anoFatura;
       dataISO = `${ano}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
     }
 
-    // Salvar na chave do mês selecionado — igual à aba Lanç.
-    // A data real da compra fica salva no campo `data` para ordenação e exibição.
-    DB.gastosCartao[mes].push({
-      id: 'gc'+Date.now()+Math.random().toString(36).slice(2,7),
-      valor: it.valor,
-      desc: it.desc,
-      catId: it.catId,
-      cartaoId: cartaoImpSelId,
-      data: dataISO,
-      portador: it.portador || 'desconhecido',
-      parcAtual: it.parcAtual||1,
-      parcTotal: it.parcTotal||1
-    });
+    // Mês desta parcela/compra (chave onde vai salvar)
+    const mesCompra = dataISO.slice(0,7);
+
+    const base = {
+      desc:      it.desc,
+      valor:     it.valor,
+      catId:     it.catId,
+      cartaoId:  cartaoImpSelId,
+      portador:  it.portador || 'desconhecido',
+      parcTotal: it.parcTotal || 1,
+    };
+
+    // ── Salvar a parcela ATUAL no mês da compra ───────────────────────────────
+    if(!DB.gastosCartao[mesCompra]) DB.gastosCartao[mesCompra] = [];
+    const jaExiste = DB.gastosCartao[mesCompra].some(g=>
+      g.desc === base.desc &&
+      Math.abs(g.valor - base.valor) < 0.01 &&
+      g.parcTotal === base.parcTotal &&
+      g.parcAtual === (it.parcAtual||1)
+    );
+    if(!jaExiste){
+      DB.gastosCartao[mesCompra].push({
+        ...base,
+        id: 'gc'+Date.now()+Math.random().toString(36).slice(2,7),
+        data:     dataISO,
+        parcAtual: it.parcAtual || 1,
+      });
+      totalCriados++;
+    }
+
+    // ── Gerar parcelas FUTURAS (parcAtual+1 até parcTotal) ────────────────────
+    if((it.parcTotal||1) > 1 && (it.parcAtual||1) < (it.parcTotal||1)){
+      for(let p = (it.parcAtual||1)+1; p <= it.parcTotal; p++){
+        const offset  = p - (it.parcAtual||1);          // meses a frente
+        const mesFut  = proximoMes(mesCompra, offset);
+        const dataFut = dataFutura(dataISO, offset);
+
+        if(!DB.gastosCartao[mesFut]) DB.gastosCartao[mesFut] = [];
+        const jaExisteFut = DB.gastosCartao[mesFut].some(g=>
+          g.desc === base.desc &&
+          Math.abs(g.valor - base.valor) < 0.01 &&
+          g.parcTotal === base.parcTotal &&
+          g.parcAtual === p
+        );
+        if(!jaExisteFut){
+          DB.gastosCartao[mesFut].push({
+            ...base,
+            id: 'gc'+Date.now()+Math.random().toString(36).slice(2,7),
+            data:     dataFut,
+            parcAtual: p,
+          });
+          totalCriados++;
+        }
+      }
+    }
   });
 
   dbSave();
-  showToast(`${parsedItemsFatura.length} itens importados ✓`);
+  const pulados = parsedItemsFatura.length - itensSelecionados.length;
+  showToast(`${itensSelecionados.length} compras importadas${pulados>0?` · ${pulados} duplicata(s) pulada(s)`:''} ✓`);
   parsedItemsFatura = [];
   document.getElementById('cartao-step-revisao').style.display = 'none';
   document.getElementById('cartao-step-lista').style.display = '';
